@@ -126,13 +126,14 @@ function buildWidget() {
     logBtn.disabled = true;
     logBtn.textContent = "Logging…";
     try {
-      const { role, company } = window.pounceScrapeJobContext();
+      const { role, company, description } = window.pounceScrapeJobContext();
       const resumeFileName = window.pounceFindResumeFileName();
       log("quick-confirm scraped:", { role, company, resumeFileName });
 
       await sendMessage("LOG_APPLICATION", {
         role,
         company,
+        description,
         url: location.href,
         source: "quick-confirm",
         resumeFileName,

@@ -18,34 +18,17 @@ function log(...args) {
   console.debug("[Streakhire]", ...args);
 }
 
-function getJobContext() {
-  const role =
-    window.pounceQueryText([
-      ".job-details-jobs-unified-top-card__job-title",
-      ".jobs-unified-top-card__job-title",
-      ".t-24.job-details-jobs-unified-top-card__job-title",
-      "h1",
-    ]) || document.title.split("|")[0]?.trim();
-
-  const company =
-    window.pounceQueryText([
-      ".job-details-jobs-unified-top-card__company-name",
-      ".jobs-unified-top-card__company-name",
-      ".jobs-unified-top-card__subtitle-primary-grouping a",
-      ".job-details-jobs-unified-top-card__primary-description-container a",
-    ]) || document.title.split("|")[1]?.trim();
-
-  return { role, company };
-}
-
 let reportedForThisModal = false;
 
 function reportOnce(source) {
   if (reportedForThisModal) return;
   reportedForThisModal = true;
-  const { role, company } = getJobContext();
+  // Shared, priority-ordered scraper (lib/detector-utils.js) — LinkedIn's
+  // own selectors are tried first within it, same as before, just no
+  // longer duplicated locally.
+  const { role, company, description } = window.pounceScrapeJobContext();
   log(`detected via ${source}:`, { role, company });
-  window.pounceReportApplication({ role, company, source: "linkedin" });
+  window.pounceReportApplication({ role, company, description, source: "linkedin" });
 }
 
 const SUBMIT_LABEL = /\bsubmit(\s+your)?\s+application\b|^submit$/i;

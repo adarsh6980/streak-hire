@@ -1,18 +1,6 @@
 // Lever-hosted application forms (jobs.lever.co). Submit button is commonly
-// [data-qa="btn-submit"], text "Submit Application".
-
-function getJobContext() {
-  const role =
-    window.pounceQueryText([".posting-headline h2", "h2"]) ||
-    document.title.split("-")[0]?.trim();
-
-  const company =
-    window.pounceQueryText([".main-header-logo img"]) ||
-    document.title.split("-").slice(1).join("-").trim() ||
-    location.hostname.split(".")[0];
-
-  return { role, company };
-}
+// [data-qa="btn-submit"], text "Submit Application". Role/company/description
+// scraping is shared (lib/detector-utils.js, window.pounceScrapeJobContext).
 
 function isSubmitButton(el) {
   if (!el) return false;
@@ -27,8 +15,8 @@ document.addEventListener(
     const button = event.target.closest("button, input[type='submit']");
     if (!isSubmitButton(button)) return;
 
-    const { role, company } = getJobContext();
-    window.pounceReportApplication({ role, company, source: "lever" });
+    const { role, company, description } = window.pounceScrapeJobContext();
+    window.pounceReportApplication({ role, company, description, source: "lever" });
   },
   true
 );

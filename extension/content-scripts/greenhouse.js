@@ -1,18 +1,8 @@
 // Greenhouse-hosted application forms (job-boards.greenhouse.io and embedded
 // company career pages using boards.greenhouse.io). The form has a single
 // submit button, commonly #submit_app, and posts via a normal form submit.
-
-function getJobContext() {
-  const role =
-    window.pounceQueryText(["h1.app-title", "#header h1", ".job__title", "h1"]) ||
-    document.title.split("-")[0]?.trim();
-
-  const company =
-    window.pounceQueryText([".company-name", "#header h2", ".job__company"]) ||
-    document.title.split("-").slice(1).join("-").trim();
-
-  return { role, company };
-}
+// Role/company/description scraping is shared (lib/detector-utils.js,
+// window.pounceScrapeJobContext) rather than duplicated per site.
 
 function isApplicationForm(form) {
   if (!form) return false;
@@ -20,12 +10,16 @@ function isApplicationForm(form) {
   return Boolean(form.querySelector("#submit_app, button[type='submit']"));
 }
 
+function report() {
+  const { role, company, description } = window.pounceScrapeJobContext();
+  window.pounceReportApplication({ role, company, description, source: "greenhouse" });
+}
+
 document.addEventListener(
   "submit",
   (event) => {
     if (!isApplicationForm(event.target)) return;
-    const { role, company } = getJobContext();
-    window.pounceReportApplication({ role, company, source: "greenhouse" });
+    report();
   },
   true
 );
@@ -39,9 +33,7 @@ document.addEventListener(
     if (!button) return;
     const label = (button.value || button.textContent || "").trim().toLowerCase();
     if (button.id !== "submit_app" && !label.includes("submit application")) return;
-
-    const { role, company } = getJobContext();
-    window.pounceReportApplication({ role, company, source: "greenhouse" });
+    report();
   },
   true
 );

@@ -69,6 +69,7 @@ body {
 .header-streak-count {
   font-weight: 700;
   font-size: 22px;
+  display: inline-block;
 }
 
 .label {
@@ -80,7 +81,7 @@ body {
 }
 
 .main {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 32px 40px 80px;
 }
@@ -100,7 +101,7 @@ body {
 }
 
 .digest-number {
-  display: block;
+  display: inline-block;
   font-weight: 700;
   font-size: 28px;
   margin-bottom: 4px;
@@ -152,6 +153,27 @@ body {
   white-space: nowrap;
 }
 
+.board-toolbar {
+  margin-bottom: 16px;
+}
+
+.search-input {
+  width: 100%;
+  max-width: 360px;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(33, 26, 18, 0.18);
+  background: var(--paper-light);
+  color: var(--ink);
+}
+
+.search-input:focus {
+  outline: 2px solid var(--stamp);
+  outline-offset: 1px;
+}
+
 .board {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -161,6 +183,9 @@ body {
 @media (max-width: 900px) {
   .board {
     grid-template-columns: 1fr;
+  }
+  .column-cards {
+    max-height: 480px !important;
   }
 }
 
@@ -180,18 +205,46 @@ body {
   color: var(--ink-soft);
 }
 
+/* Fixes the "100 applications in one endless column" problem: each column
+   scrolls independently within a bounded height instead of the whole page
+   growing without limit. */
 .column-cards {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-height: 40px;
+  max-height: calc(100vh - 340px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--kraft) transparent;
+}
+
+.column-cards::-webkit-scrollbar {
+  width: 6px;
+}
+
+.column-cards::-webkit-scrollbar-thumb {
+  background: var(--kraft);
+  border-radius: 999px;
 }
 
 .card {
   background: var(--paper-light);
   border: 1px solid rgba(33, 26, 18, 0.12);
   border-radius: 12px;
-  padding: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+/* The Tilt-Not-Lift Rule (DESIGN.md): physical presence on hover comes from
+   a slight rotation, never a drop-shadow lift. */
+.card:hover,
+.card:focus-visible {
+  border-color: var(--stamp);
+  transform: rotate(-0.6deg);
+  outline: none;
 }
 
 .card-top {
@@ -206,12 +259,18 @@ body {
   font-size: 13px;
   margin: 0;
   line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .card-company {
   font-size: 12px;
   color: var(--ink-soft);
   margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .card-badge {
@@ -223,6 +282,7 @@ body {
   border-radius: 999px;
   padding: 2px 6px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .card-date {
@@ -230,74 +290,21 @@ body {
   font-size: 10px;
   color: var(--ink-soft);
   opacity: 0.7;
-  margin: 8px 0 0;
-}
-
-.card-resume-row {
-  margin-top: 6px;
+  margin: 6px 0 0;
 }
 
 .card-resume-chip {
   display: inline-block;
-  font-size: 11px;
+  font-size: 10px;
   background: rgba(31, 63, 107, 0.1);
   color: var(--airmail);
   border-radius: 6px;
   padding: 2px 8px;
-}
-
-.card-expand-btn {
-  margin-top: 8px;
-  background: none;
-  border: none;
-  color: var(--ink-soft);
-  font-size: 11px;
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 0;
-}
-
-.card-expand {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field-label {
-  font-family: "Courier New", monospace;
-  font-size: 10px;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
-.card-resume-input,
-.card-notes-input {
-  font-family: inherit;
-  font-size: 12px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(33, 26, 18, 0.18);
-  background: #fff;
-  color: var(--ink);
-  resize: vertical;
-}
-
-.card-save-btn {
-  align-self: flex-start;
-  background: var(--stamp);
-  color: var(--paper-light);
-  border: none;
-  border-radius: 999px;
-  padding: 6px 14px;
-  font-family: "Courier New", monospace;
-  font-size: 11px;
-  text-transform: uppercase;
-  cursor: pointer;
+  margin-top: 6px;
 }
 
 .card-status-select {
-  margin-top: 10px;
+  margin-top: 8px;
   width: 100%;
   font-family: "Courier New", monospace;
   font-size: 11px;
@@ -307,6 +314,7 @@ body {
   border: 1px solid rgba(33, 26, 18, 0.18);
   background: #fff;
   color: var(--ink);
+  cursor: pointer;
 }
 
 .empty-state {
@@ -314,4 +322,192 @@ body {
   color: var(--ink-soft);
   font-size: 14px;
   padding: 60px 20px;
+}
+
+.empty-logo {
+  width: 40px;
+  height: 40px;
+  color: var(--kraft);
+  margin: 0 auto 12px;
+  display: block;
+}
+
+/* Detail modal */
+
+.detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(33, 26, 18, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.detail-modal {
+  background: var(--paper-light);
+  border-radius: 16px;
+  border: 1px solid rgba(33, 26, 18, 0.15);
+  max-width: 560px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 28px;
+  position: relative;
+}
+
+.detail-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--ink-soft);
+  padding: 4px;
+}
+
+.detail-role {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 10px 0 2px;
+}
+
+.detail-company {
+  font-size: 15px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.detail-link {
+  color: var(--airmail);
+  text-decoration: underline;
+}
+
+.detail-section {
+  margin-top: 18px;
+}
+
+.detail-value {
+  font-size: 13px;
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.detail-description {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 6px;
+  color: var(--ink-soft);
+}
+
+.detail-actions {
+  margin-top: 22px;
+  display: flex;
+  gap: 10px;
+}
+
+.detail-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.detail-edit-form input,
+.detail-edit-form textarea {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(33, 26, 18, 0.18);
+  background: #fff;
+  color: var(--ink);
+  resize: vertical;
+  margin-bottom: 10px;
+}
+
+.field-label {
+  font-family: "Courier New", monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.btn-primary {
+  background: var(--stamp);
+  color: var(--paper-light);
+  border: none;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: var(--stamp-dark);
+}
+
+.btn-secondary {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid rgba(33, 26, 18, 0.2);
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.btn-ghost {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 9px 10px;
+}
+
+.btn-danger {
+  background: none;
+  border: 1px solid var(--stamp);
+  color: var(--stamp);
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: var(--stamp);
+  color: var(--paper-light);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }

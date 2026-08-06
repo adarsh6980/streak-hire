@@ -44,8 +44,103 @@ window.pounceFindResumeFileName = function findResumeFileName() {
   return (resumeLike || withFiles[0]).files[0].name;
 };
 
+// A candidate string is rejected if it's too short to be real, or matches
+// known chrome/nav junk we've actually seen picked up by a too-eager
+// selector (e.g. LinkedIn's notification-count badge reading "0
+// notifications" when a generic h1 selector matched the wrong element).
+const JUNK_TEXT = /^\d+\s*(notification|message|alert)s?$/i;
+
+function isValidCandidate(text) {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (trimmed.length < 2) return false;
+  if (JUNK_TEXT.test(trimmed)) return false;
+  return true;
+}
+
+// Small helper: first *valid* text match from a list of selectors, tried in
+// order — site-specific selectors should always be listed before generic
+// ones, since generic selectors (bare "h1", "[class*='title']") are the
+// ones prone to matching chrome/nav elements on sites with a known layout.
+window.pounceQueryText = function queryText(selectors) {
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    const text = el?.textContent?.trim();
+    if (isValidCandidate(text)) return text;
+  }
+  return null;
+};
+
+// One shared, priority-ordered scrape used by the universal widget and (as
+// a duplicated-but-synced copy, see background.js's
+// scrapeCurrentPageForJobContext) the popup's on-demand scrape button.
+// Site-specific selectors for every detector we ship come first — copied
+// from each site's own content-script — generic fallbacks come last, and a
+// bare "h1" is the very last resort rather than the first attempt, which is
+// what previously let LinkedIn's nav/notification markup get picked up
+// instead of the real job title.
+window.pounceScrapeJobContext = function scrapeJobContext() {
+  const role =
+    window.pounceQueryText([
+      // LinkedIn
+      ".job-details-jobs-unified-top-card__job-title",
+      ".jobs-unified-top-card__job-title",
+      ".t-24.job-details-jobs-unified-top-card__job-title",
+      // Greenhouse
+      "h1.app-title",
+      "#header h1",
+      ".job__title",
+      // Lever
+      ".posting-headline h2",
+      // Workday
+      "[data-automation-id='jobPostingHeader']",
+      // Generic
+      "[class*='job-title' i]",
+      "[class*='jobtitle' i]",
+      "[data-testid*='title' i]",
+      "h1",
+    ]) || document.title.split(/[-|·•]/)[0]?.trim();
+
+  const company =
+    window.pounceQueryText([
+      // LinkedIn
+      ".job-details-jobs-unified-top-card__company-name",
+      ".jobs-unified-top-card__company-name",
+      ".jobs-unified-top-card__subtitle-primary-grouping a",
+      ".job-details-jobs-unified-top-card__primary-description-container a",
+      // Greenhouse
+      ".company-name",
+      "#header h2",
+      ".job__company",
+      // Generic
+      "[class*='company-name' i]",
+      "[class*='companyname' i]",
+      "[class*='employer' i]",
+      "[data-testid*='company' i]",
+    ]) || location.hostname.replace("www.", "").split(".")[0];
+
+  const descriptionRaw = window.pounceQueryText([
+    // LinkedIn
+    ".job-details-jobs-unified-top-card__job-description",
+    ".jobs-description__content",
+    ".jobs-box__html-content",
+    // Greenhouse
+    "#content",
+    // Lever
+    ".posting-description",
+    // Generic
+    "[class*='description' i]",
+  ]);
+  // Firestore documents cap at 1MB; a full page's description text has no
+  // reason to approach that, so trim to a sane length rather than store
+  // arbitrary amounts of scraped HTML-derived text.
+  const description = descriptionRaw ? descriptionRaw.slice(0, 2000) : null;
+
+  return { role, company, description };
+};
+
 // Call this from a site detector once it's confident a submit happened.
-window.pounceReportApplication = function reportApplication({ company, role, source }) {
+window.pounceReportApplication = function reportApplication({ company, role, source, description }) {
   const dedupeKey = `${source}:${location.href}`;
   if (alreadyReported(dedupeKey)) return;
   markReported(dedupeKey);
@@ -55,42 +150,10 @@ window.pounceReportApplication = function reportApplication({ company, role, sou
     payload: {
       company,
       role,
+      description: description || null,
       url: location.href,
       source,
       resumeFileName: window.pounceFindResumeFileName(),
     },
   });
-};
-
-// Small helper: first non-empty text match from a list of selectors.
-window.pounceQueryText = function queryText(selectors) {
-  for (const sel of selectors) {
-    const el = document.querySelector(sel);
-    const text = el?.textContent?.trim();
-    if (text) return text;
-  }
-  return null;
-};
-
-// Generic, site-agnostic best-effort scrape of role/company from whatever
-// page the user is currently on — used by the universal quick-confirm
-// widget, which by definition has no site-specific selectors to rely on.
-window.pounceScrapeJobContext = function scrapeJobContext() {
-  const role =
-    window.pounceQueryText([
-      "h1",
-      "[class*='job-title' i]",
-      "[class*='jobtitle' i]",
-      "[data-testid*='title' i]",
-    ]) || document.title.split(/[-|·•]/)[0]?.trim();
-
-  const company =
-    window.pounceQueryText([
-      "[class*='company-name' i]",
-      "[class*='companyname' i]",
-      "[class*='employer' i]",
-      "[data-testid*='company' i]",
-    ]) || location.hostname.replace("www.", "").split(".")[0];
-
-  return { role, company };
 };

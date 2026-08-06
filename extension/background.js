@@ -4,6 +4,7 @@ import {
   setUserDoc,
   addApplication,
   updateApplication,
+  deleteApplication,
   listRecentApplications,
 } from "./lib/firestore.js";
 import { applyStreakUpdate } from "./lib/streak.js";
@@ -66,7 +67,7 @@ async function getState() {
   };
 }
 
-async function logApplication({ company, role, url, source, auto, resumeFileName }) {
+async function logApplication({ company, role, url, source, auto, resumeFileName, description }) {
   const session = await getStoredSession();
   if (!session) throw new Error("Not signed in");
   const idToken = await getValidIdToken();
@@ -78,6 +79,7 @@ async function logApplication({ company, role, url, source, auto, resumeFileName
     addApplication(session.uid, idToken, {
       company: company || "Unknown company",
       role: role || "Unknown role",
+      description: description || null,
       url: url || "",
       source: source || "manual",
       auto: Boolean(auto),
@@ -110,32 +112,78 @@ async function logApplication({ company, role, url, source, auto, resumeFileName
 // Self-contained on purpose: chrome.scripting.executeScript serializes this
 // function and runs it inside the target tab's page context, so it can't
 // reference anything from this file's scope (imports, other functions,
-// constants) — only what's declared inside it.
+// constants) — only what's declared inside it. This is a duplicate of
+// lib/detector-utils.js's pounceScrapeJobContext for that reason — keep the
+// two in sync by hand if selectors change; detector-utils.js is the source
+// of truth.
 function scrapeCurrentPageForJobContext() {
+  const JUNK_TEXT = /^\d+\s*(notification|message|alert)s?$/i;
+
+  function isValidCandidate(text) {
+    if (!text) return false;
+    const trimmed = text.trim();
+    if (trimmed.length < 2) return false;
+    if (JUNK_TEXT.test(trimmed)) return false;
+    return true;
+  }
+
   function queryText(selectors) {
     for (const sel of selectors) {
       const el = document.querySelector(sel);
       const text = el?.textContent?.trim();
-      if (text) return text;
+      if (isValidCandidate(text)) return text;
     }
     return null;
   }
 
   const role =
     queryText([
-      "h1",
+      // LinkedIn
+      ".job-details-jobs-unified-top-card__job-title",
+      ".jobs-unified-top-card__job-title",
+      ".t-24.job-details-jobs-unified-top-card__job-title",
+      // Greenhouse
+      "h1.app-title",
+      "#header h1",
+      ".job__title",
+      // Lever
+      ".posting-headline h2",
+      // Workday
+      "[data-automation-id='jobPostingHeader']",
+      // Generic
       "[class*='job-title' i]",
       "[class*='jobtitle' i]",
       "[data-testid*='title' i]",
+      "h1",
     ]) || document.title.split(/[-|·•]/)[0]?.trim();
 
   const company =
     queryText([
+      // LinkedIn
+      ".job-details-jobs-unified-top-card__company-name",
+      ".jobs-unified-top-card__company-name",
+      ".jobs-unified-top-card__subtitle-primary-grouping a",
+      ".job-details-jobs-unified-top-card__primary-description-container a",
+      // Greenhouse
+      ".company-name",
+      "#header h2",
+      ".job__company",
+      // Generic
       "[class*='company-name' i]",
       "[class*='companyname' i]",
       "[class*='employer' i]",
       "[data-testid*='company' i]",
     ]) || location.hostname.replace("www.", "").split(".")[0];
+
+  const descriptionRaw = queryText([
+    ".job-details-jobs-unified-top-card__job-description",
+    ".jobs-description__content",
+    ".jobs-box__html-content",
+    "#content",
+    ".posting-description",
+    "[class*='description' i]",
+  ]);
+  const description = descriptionRaw ? descriptionRaw.slice(0, 2000) : null;
 
   const fileInputs = Array.from(document.querySelectorAll("input[type='file']"));
   const withFiles = fileInputs.filter((el) => el.files && el.files.length > 0);
@@ -145,7 +193,7 @@ function scrapeCurrentPageForJobContext() {
   });
   const resumeFileName = (resumeLike || withFiles[0])?.files[0]?.name || null;
 
-  return { role, company, url: location.href, resumeFileName };
+  return { role, company, description, url: location.href, resumeFileName };
 }
 
 async function scrapeAndLogActiveTab() {
@@ -178,14 +226,32 @@ async function updateApplicationStatus({ applicationId, status }) {
   return { ok: true };
 }
 
-async function updateApplicationDetails({ applicationId, notes, resumeFileName }) {
+async function updateApplicationDetails({
+  applicationId,
+  notes,
+  resumeFileName,
+  role,
+  company,
+  description,
+}) {
   const session = await getStoredSession();
   if (!session) throw new Error("Not signed in");
   const idToken = await getValidIdToken();
   const patch = {};
   if (notes !== undefined) patch.notes = notes;
   if (resumeFileName !== undefined) patch.resumeFileName = resumeFileName;
+  if (role !== undefined) patch.role = role;
+  if (company !== undefined) patch.company = company;
+  if (description !== undefined) patch.description = description;
   await updateApplication(session.uid, idToken, applicationId, patch);
+  return { ok: true };
+}
+
+async function deleteApplicationHandler({ applicationId }) {
+  const session = await getStoredSession();
+  if (!session) throw new Error("Not signed in");
+  const idToken = await getValidIdToken();
+  await deleteApplication(session.uid, idToken, applicationId);
   return { ok: true };
 }
 
@@ -314,6 +380,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break;
         case "UPDATE_APPLICATION_DETAILS":
           sendResponse({ ok: true, data: await updateApplicationDetails(message.payload) });
+          break;
+        case "DELETE_APPLICATION":
+          sendResponse({ ok: true, data: await deleteApplicationHandler(message.payload) });
           break;
         case "MARK_FOLLOWED_UP":
           sendResponse({ ok: true, data: await markFollowedUp(message.payload) });

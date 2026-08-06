@@ -1,19 +1,8 @@
 // Workday (*.myworkdayjobs.com) runs a multi-step application wizard ending
 // in a review page with a final "Submit" button. Workday's DOM uses generated
 // data-automation-id attributes that are relatively stable across tenants.
-
-function getJobContext() {
-  const role =
-    window.pounceQueryText([
-      "[data-automation-id='jobPostingHeader']",
-      "h1",
-    ]) || document.title.split("|")[0]?.trim();
-
-  // Workday tenants are subdomains, e.g. acme.wd5.myworkdayjobs.com
-  const company = location.hostname.split(".")[0];
-
-  return { role, company };
-}
+// Role/company/description scraping is shared (lib/detector-utils.js,
+// window.pounceScrapeJobContext).
 
 function isFinalSubmitButton(el) {
   if (!el) return false;
@@ -39,8 +28,8 @@ document.addEventListener(
     );
     if (!onReviewStep) return;
 
-    const { role, company } = getJobContext();
-    window.pounceReportApplication({ role, company, source: "workday" });
+    const { role, company, description } = window.pounceScrapeJobContext();
+    window.pounceReportApplication({ role, company, description, source: "workday" });
   },
   true
 );

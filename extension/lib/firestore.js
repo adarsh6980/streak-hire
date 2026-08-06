@@ -75,7 +75,11 @@ async function firestoreFetch(path, { method = "GET", body, idToken, query = "" 
     throw new Error(`Firestore ${method} ${path} failed: ${res.status} ${text}`);
   }
   if (res.status === 204) return null;
-  return res.json();
+  // Firestore's DELETE response is a 200 with an empty (or "{}") body —
+  // guard against res.json() throwing on truly empty content rather than
+  // assuming every non-204 response has a parseable body.
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 export async function getUserDoc(uid, idToken) {
@@ -116,6 +120,13 @@ export async function updateApplication(uid, idToken, applicationId, patch) {
     idToken,
     query,
     body: { fields: toFirestoreFields(patch) },
+  });
+}
+
+export async function deleteApplication(uid, idToken, applicationId) {
+  await firestoreFetch(`/users/${uid}/applications/${applicationId}`, {
+    method: "DELETE",
+    idToken,
   });
 }
 

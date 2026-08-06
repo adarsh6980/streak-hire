@@ -44,6 +44,15 @@
       <ul id="followup-list" class="followup-list"></ul>
     </section>
 
+    <div class="board-toolbar">
+      <input
+        id="search-input"
+        type="text"
+        class="search-input"
+        placeholder="Search by role or company…"
+      />
+    </div>
+
     <section class="board">
       <div class="board-column" data-status="applied">
         <h2 class="column-title">Applied <span class="column-count" id="count-applied">0</span></h2>
@@ -63,13 +72,20 @@
       </div>
     </section>
 
-    <p id="empty-state" class="empty-state hidden">
-      Nothing logged yet. Applications you postmark — automatically or manually — will show up here.
-    </p>
+    <div id="empty-state" class="empty-state hidden">
+      <svg viewBox="0 0 44 44" class="empty-logo" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="22" cy="22" r="20.5" stroke="currentColor" stroke-width="1.5" />
+        <circle cx="22" cy="22" r="16" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5 3.5" />
+        <path d="M13 22.5L19.5 28L31 15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <p>Nothing logged yet. Applications you postmark — automatically or manually — will show up here.</p>
+    </div>
+
+    <p id="no-results-state" class="empty-state hidden">No applications match that search.</p>
   </main>
 
   <template id="card-template">
-    <article class="card">
+    <article class="card" tabindex="0">
       <div class="card-top">
         <div>
           <p class="card-role"></p>
@@ -78,17 +94,7 @@
         <span class="card-badge"></span>
       </div>
       <p class="card-date"></p>
-      <div class="card-resume-row">
-        <span class="card-resume-chip hidden"></span>
-      </div>
-      <button class="card-expand-btn" type="button">Notes &amp; resume</button>
-      <div class="card-expand hidden">
-        <label class="field-label">Resume file used</label>
-        <input type="text" class="card-resume-input" placeholder="e.g. adarsh-resume-v3.pdf" />
-        <label class="field-label">Notes</label>
-        <textarea class="card-notes-input" rows="3" placeholder="Recruiter name, interview feedback…"></textarea>
-        <button class="card-save-btn" type="button">Save</button>
-      </div>
+      <span class="card-resume-chip hidden"></span>
       <select class="card-status-select">
         <option value="applied">Applied</option>
         <option value="interviewing">Interviewing</option>
@@ -97,6 +103,66 @@
       </select>
     </article>
   </template>
+
+  <div id="detail-overlay" class="detail-overlay hidden">
+    <div class="detail-modal">
+      <button id="detail-close" class="detail-close" aria-label="Close" type="button">&times;</button>
+
+      <div id="detail-view">
+        <span id="detail-badge" class="card-badge"></span>
+        <h2 id="detail-role" class="detail-role"></h2>
+        <p id="detail-company" class="detail-company"></p>
+
+        <div class="detail-meta">
+          <span id="detail-date"></span>
+          <span id="detail-source"></span>
+          <a id="detail-url" class="detail-link hidden" target="_blank" rel="noreferrer">View original posting ↗</a>
+        </div>
+
+        <div class="detail-section">
+          <p class="field-label">Resume file</p>
+          <p id="detail-resume" class="detail-value"></p>
+        </div>
+
+        <div class="detail-section">
+          <p class="field-label">Notes</p>
+          <p id="detail-notes" class="detail-value"></p>
+        </div>
+
+        <div class="detail-section">
+          <p class="field-label">Job description</p>
+          <p id="detail-description" class="detail-value detail-description"></p>
+        </div>
+
+        <div class="detail-actions">
+          <button id="detail-edit-btn" class="btn-secondary" type="button">Edit</button>
+          <button id="detail-delete-btn" class="btn-danger" type="button">Delete</button>
+        </div>
+      </div>
+
+      <form id="detail-edit-form" class="detail-edit-form hidden">
+        <label class="field-label">Role</label>
+        <input id="edit-role" type="text" />
+
+        <label class="field-label">Company</label>
+        <input id="edit-company" type="text" />
+
+        <label class="field-label">Resume file</label>
+        <input id="edit-resume" type="text" placeholder="e.g. adarsh-resume-v3.pdf" />
+
+        <label class="field-label">Notes</label>
+        <textarea id="edit-notes" rows="3" placeholder="Recruiter name, interview feedback…"></textarea>
+
+        <label class="field-label">Job description</label>
+        <textarea id="edit-description" rows="6"></textarea>
+
+        <div class="detail-actions">
+          <button type="submit" class="btn-primary">Save</button>
+          <button type="button" id="detail-cancel-btn" class="btn-ghost">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script src="dashboard.js" type="module"></script>
 </body>
