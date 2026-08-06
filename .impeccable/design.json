@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-06T00:00:00.000Z",
+  "title": "Design System: Streakhire",
+  "extensions": {
+    "colorMeta": {
+      "stamp": {
+        "role": "primary",
+        "displayName": "Postmark Red",
+        "canonical": "#c8401f",
+        "tonalRamp": ["#2e0a03", "#591708", "#8a2711", "#b0371c", "#c8401f", "#d95f34", "#e58a63", "#f4c9b8"]
+      },
+      "stamp-dark": {
+        "role": "primary-hover",
+        "displayName": "Postmark Red Dark",
+        "canonical": "#9c2f15"
+      },
+      "stamp-light": {
+        "role": "primary-on-dark",
+        "displayName": "Postmark Red Light",
+        "canonical": "#e0592f"
+      },
+      "airmail": {
+        "role": "secondary",
+        "displayName": "Airmail Blue",
+        "canonical": "#1f3f6b",
+        "tonalRamp": ["#0a1a2c", "#12294a", "#1a3660", "#1f3f6b", "#2f5b93", "#4d7bb0", "#7fa3cb", "#c3d7ea"]
+      },
+      "airmail-light": {
+        "role": "secondary-alt",
+        "displayName": "Airmail Blue Light",
+        "canonical": "#2f5b93"
+      },
+      "offer": {
+        "role": "tertiary",
+        "displayName": "Offer Green",
+        "canonical": "#2f6b45",
+        "tonalRamp": ["#122a1b", "#1e4530", "#26583a", "#2f6b45", "#3f8759", "#5fa878", "#8fc7a4", "#d1ecdc"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#f4ecd9",
+        "tonalRamp": ["#211a12", "#4a3f2a", "#6f5f42", "#b89f74", "#d8c39c", "#e8dcc0", "#f4ecd9", "#faf5e9"]
+      },
+      "paper-light": {
+        "role": "neutral-surface",
+        "displayName": "Paper Light",
+        "canonical": "#faf5e9"
+      },
+      "paper-dark": {
+        "role": "neutral-inset",
+        "displayName": "Paper Dark",
+        "canonical": "#e8dcc0"
+      },
+      "kraft": {
+        "role": "neutral-texture",
+        "displayName": "Kraft",
+        "canonical": "#d8c39c"
+      },
+      "kraft-dark": {
+        "role": "neutral-texture-border",
+        "displayName": "Kraft Dark",
+        "canonical": "#b89f74"
+      },
+      "ink": {
+        "role": "neutral-text",
+        "displayName": "Ink",
+        "canonical": "#211a12",
+        "tonalRamp": ["#0d0a06", "#1a140d", "#211a12", "#332a1e", "#4a4033", "#6b5f4f", "#948a76", "#c9c0ae"]
+      },
+      "ink-soft": {
+        "role": "neutral-text-secondary",
+        "displayName": "Ink Soft",
+        "canonical": "#4a4033"
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display (Space Grotesk)", "purpose": "Hero headline, section headlines, card/step titles. Never used for body copy." },
+      "body": { "displayName": "Body (DM Sans)", "purpose": "Paragraph copy, feature descriptions, FAQ answers. Set in Ink Soft." },
+      "label": { "displayName": "Label / Mono (Space Mono)", "purpose": "Anything that reads as system-generated: nav links, buttons, tracking numbers, postmark ring text, pipeline status, footer columns. Always uppercase." }
+    },
+    "shadows": [
+      { "name": "stamp", "value": "0 1px 0 rgba(33,26,18,0.08), 0 8px 24px -12px rgba(33,26,18,0.35)", "purpose": "The only shadow in the system. Reserved for objects being 'pressed down' — hero demo card, primary CTAs, highlighted pricing tier. Never used for generic card lift." }
+    ],
+    "motion": [
+      { "name": "entrance-ease", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Standard scroll-reveal and section entrance easing (opacity + y translate)." },
+      { "name": "stamp-overshoot-ease", "value": "cubic-bezier(0.34, 1.56, 0.64, 1)", "purpose": "Spring-overshoot easing used when a postmark ring stamps into place, giving it a punch/settle feel." },
+      { "name": "header-spring", "value": "type: spring, stiffness: 120, damping: 20", "purpose": "Navbar entrance on load." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Pill CTA in Postmark Red with the stamp shadow; used for install/upgrade actions.",
+      "html": "<button class=\"ds-btn-primary\">Add to Chrome — free</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 9999px; background: #c8401f; color: #faf5e9; font-family: 'Space Mono', monospace; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 24px; border: none; box-shadow: 0 1px 0 rgba(33,26,18,0.08), 0 8px 24px -12px rgba(33,26,18,0.35); transition: background 0.2s ease; cursor: pointer; } .ds-btn-primary:hover { background: #9c2f15; } .ds-btn-primary:focus-visible { outline: 2px solid #1f3f6b; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Pill ghost CTA with hairline border; paired alongside the primary CTA (e.g. 'Add to Comet').",
+      "html": "<button class=\"ds-btn-secondary\">Add to Comet</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 9999px; background: #faf5e9; color: #211a12; font-family: 'Space Mono', monospace; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 24px; border: 1px solid rgba(33,26,18,0.2); transition: border-color 0.2s ease; cursor: pointer; } .ds-btn-secondary:hover { border-color: rgba(33,26,18,0.4); } .ds-btn-secondary:focus-visible { outline: 2px solid #1f3f6b; outline-offset: 2px; }"
+    },
+    {
+      "name": "Feature Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Bordered paper-light panel used for feature, step, and pricing content.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">It stamps itself.</h3><p class=\"ds-card-body\">Install the extension once. Every application gets logged instantly.</p></div>",
+      "css": ".ds-card { background: #faf5e9; border: 1px solid rgba(33,26,18,0.12); border-radius: 16px; padding: 28px; } .ds-card-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; color: #211a12; margin: 0 0 12px; } .ds-card-body { font-family: 'DM Sans', sans-serif; font-size: 15px; line-height: 1.6; color: #4a4033; margin: 0; }"
+    },
+    {
+      "name": "Postmark Stamp",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Signature two-line rubber-stamp ring marking an automatic action ('APPLIED / AUTO'). The system's core automation indicator — reuse rather than inventing a new one.",
+      "html": "<div class=\"ds-postmark\"><span class=\"ds-postmark-line1\">APPLIED</span><span class=\"ds-postmark-line2\">AUTO</span></div>",
+      "css": ".ds-postmark { width: 64px; height: 64px; border-radius: 9999px; border: 2px solid #c8401f; color: #c8401f; display: flex; flex-direction: column; align-items: center; justify-content: center; transform: rotate(-18deg); font-family: 'Space Mono', monospace; background: transparent; } .ds-postmark-line1 { font-size: 8px; font-weight: 700; letter-spacing: 0.08em; line-height: 1; } .ds-postmark-line2 { font-size: 7px; line-height: 1; margin-top: 2px; }"
+    },
+    {
+      "name": "Streak Day Dot",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "One day of the streak strip: mono day-letter above a ring that fills solid when stamped, dims when not.",
+      "html": "<div class=\"ds-streak-day\"><span class=\"ds-streak-label\">M</span><div class=\"ds-streak-ring ds-streak-ring--stamped\"><div class=\"ds-streak-dot\"></div></div></div>",
+      "css": ".ds-streak-day { display: flex; flex-direction: column; align-items: center; gap: 4px; } .ds-streak-label { font-family: 'Space Mono', monospace; font-size: 9px; color: rgba(74,64,51,0.7); } .ds-streak-ring { width: 24px; height: 24px; border-radius: 9999px; border: 1px solid rgba(33,26,18,0.15); color: rgba(33,26,18,0.2); display: flex; align-items: center; justify-content: center; } .ds-streak-ring--stamped { border-color: #c8401f; color: #c8401f; } .ds-streak-dot { width: 10px; height: 10px; border-radius: 9999px; background: #c8401f; }"
+    },
+    {
+      "name": "Nav Link",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Mono uppercase nav link with a red underline that grows from the left on hover.",
+      "html": "<a href=\"#\" class=\"ds-nav-link\">How it works</a>",
+      "css": ".ds-nav-link { position: relative; font-family: 'Space Mono', monospace; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #4a4033; text-decoration: none; padding: 4px 0; display: inline-block; } .ds-nav-link::after { content: ''; position: absolute; left: 0; bottom: -2px; height: 1.5px; width: 0; background: #c8401f; transition: width 0.2s ease; } .ds-nav-link:hover { color: #211a12; } .ds-nav-link:hover::after, .ds-nav-link:focus-visible::after { width: 100%; } .ds-nav-link:focus-visible { outline: 2px solid #1f3f6b; outline-offset: 2px; }"
+    },
+    {
+      "name": "FAQ Accordion Item",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Divided-list question row with a mono '+' ring that rotates to '×' and turns Postmark Red when open.",
+      "html": "<div class=\"ds-faq-item\"><button class=\"ds-faq-question\"><span>How does the extension know I applied?</span><span class=\"ds-faq-toggle ds-faq-toggle--open\">+</span></button></div>",
+      "css": ".ds-faq-item { border-bottom: 1px solid rgba(33,26,18,0.12); } .ds-faq-question { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0; background: none; border: none; text-align: left; cursor: pointer; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px; color: #211a12; } .ds-faq-toggle { flex-shrink: 0; width: 28px; height: 28px; border-radius: 9999px; border: 1px solid rgba(33,26,18,0.25); color: #4a4033; display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; transition: transform 0.25s ease, border-color 0.2s ease, color 0.2s ease; } .ds-faq-toggle--open { border-color: #c8401f; color: #c8401f; transform: rotate(45deg); } .ds-faq-question:focus-visible { outline: 2px solid #1f3f6b; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Sorting Facility",
+    "overview": "Streakhire's world is a postal sorting facility: kraft paper, cancellation-mark ink, tracking numbers, and the specific choreography of a stamp coming down on a form. The system exists to make one claim visible without saying it in copy — that the application was processed by a machine, the instant it arrived, with no one standing over it. Every recurring device (the rotated postmark ring, the dashed cancellation lines, the diagonal airmail stripe) is a piece of sorting-room machinery doing real work, not a texture applied for mood.\n\nThe system explicitly refuses two defaults: the dark-SaaS-gradient hero (glossy, nocturnal, un-postal) and the cartoon-mascot gamification layer that most streak products reach for. Warmth here comes from paper and ink, not from a character. Density is unhurried — generous section padding (96–128px vertical rhythm), single-column focus per idea, and confident whitespace around the postmark set-pieces so the stamp motion has room to read.",
+    "keyCharacteristics": [
+      "Kraft/paper ground with postmark-red ink as the sole loud color",
+      "Rubber-stamp rotation (−1.5° to −18°) as the physicality signal, not drop shadows",
+      "Airmail diagonal stripe used as a structural rule at world boundaries, never as decoration",
+      "Space Mono uppercase for anything that reads as a system label (tracking numbers, nav, badges)",
+      "No eyebrow/kicker labels above headings anywhere in the system"
+    ],
+    "rules": [
+      { "name": "The One Loud Color Rule", "body": "Postmark Red is the only saturated, high-chroma color permitted to carry emphasis (CTAs, active states, the stamp itself). Airmail Blue and Offer Green are desaturated by comparison and restricted to structural or status roles — they never compete with red for attention.", "section": "colors" },
+      { "name": "The No-Kicker Rule", "body": "Eyebrow/kicker labels above headings are banned system-wide. This was tried and deliberately removed during finish review — headings carry their own weight via Display type and don't need a small-caps label pointing at them first.", "section": "typography" },
+      { "name": "The Mono-Means-System Rule", "body": "Space Mono is reserved for anything that reads as machine-generated or systemic (tracking numbers, timestamps, nav, buttons, badges). Space Grotesk is reserved for anything authored (headlines, titles). Body copy never uses Mono.", "section": "typography" },
+      { "name": "The Tilt-Not-Lift Rule", "body": "Depth and physicality come from rotation (stamps, cards sitting slightly askew), not from shadow stacking. shadow-stamp is the only shadow in the system and it is used sparingly, on stamped/pressed objects only.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do treat the airmail-stripe diagonal as a structural boundary rule (navbar-on-scroll, hero top, footer top) — it marks a transition between world zones, never decorate a random section with it.",
+      "Do use rotation (−1.5° to −18°) to signal physicality on stamped/pressed elements instead of adding shadow.",
+      "Do set anything system-generated (tracking numbers, timestamps, nav, buttons, badges, pipeline status) in uppercase Space Mono.",
+      "Do reuse the postmark-ring + \"APPLIED/AUTO\" device for any new automatic-logging moment rather than inventing a second automation motif.",
+      "Do keep Postmark Red as the only saturated accent color on any given screen; let Airmail Blue and Offer Green stay administrative."
+    ],
+    "donts": [
+      "Don't use a dark-gradient SaaS hero treatment — this system's hero is warm paper and ink, explicitly rejecting that default.",
+      "Don't introduce a cartoon mascot or character-based gamification device — the streak is expressed through the postmark/stamp vocabulary, not a character.",
+      "Don't add an eyebrow/kicker label above any heading — this was tried and removed in finish review; headings stand alone.",
+      "Don't apply generic ambient drop shadows to cards for \"lift\" — shadow-stamp is the only shadow in the system and it is reserved for stamped/pressed objects.",
+      "Don't square off buttons or badges — the pill/circle vocabulary (via rounded-full) is load-bearing to the postal-facility form language."
+    ]
+  }
+}

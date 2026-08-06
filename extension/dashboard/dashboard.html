@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Streakhire — Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+  <div class="stripe"></div>
+
+  <header class="header">
+    <div class="brand">
+      <svg viewBox="0 0 44 44" class="logo" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="22" cy="22" r="20.5" stroke="currentColor" stroke-width="1.5" />
+        <circle cx="22" cy="22" r="16" stroke="currentColor" stroke-width="1" stroke-dasharray="1.5 3.5" />
+        <path d="M13 22.5L19.5 28L31 15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <span>Streakhire</span>
+    </div>
+    <div class="header-streak">
+      <span class="label">Current streak</span>
+      <span id="header-streak-count" class="header-streak-count">—</span>
+    </div>
+  </header>
+
+  <main class="main">
+    <section id="digest-bar" class="digest-bar">
+      <div class="digest-stat">
+        <span id="digest-week-count" class="digest-number">0</span>
+        <span class="label">Applied this week</span>
+      </div>
+      <div class="digest-stat">
+        <span id="digest-interview-count" class="digest-number">0</span>
+        <span class="label">Interviewing</span>
+      </div>
+      <div class="digest-stat">
+        <span id="digest-total-count" class="digest-number">0</span>
+        <span class="label">Total logged</span>
+      </div>
+    </section>
+
+    <section id="followup-banner" class="followup-banner hidden">
+      <p class="followup-title">Needs a follow-up</p>
+      <ul id="followup-list" class="followup-list"></ul>
+    </section>
+
+    <section class="board">
+      <div class="board-column" data-status="applied">
+        <h2 class="column-title">Applied <span class="column-count" id="count-applied">0</span></h2>
+        <div class="column-cards" id="cards-applied"></div>
+      </div>
+      <div class="board-column" data-status="interviewing">
+        <h2 class="column-title">Interviewing <span class="column-count" id="count-interviewing">0</span></h2>
+        <div class="column-cards" id="cards-interviewing"></div>
+      </div>
+      <div class="board-column" data-status="offer">
+        <h2 class="column-title">Offer <span class="column-count" id="count-offer">0</span></h2>
+        <div class="column-cards" id="cards-offer"></div>
+      </div>
+      <div class="board-column" data-status="rejected">
+        <h2 class="column-title">Rejected <span class="column-count" id="count-rejected">0</span></h2>
+        <div class="column-cards" id="cards-rejected"></div>
+      </div>
+    </section>
+
+    <p id="empty-state" class="empty-state hidden">
+      Nothing logged yet. Applications you postmark — automatically or manually — will show up here.
+    </p>
+  </main>
+
+  <template id="card-template">
+    <article class="card">
+      <div class="card-top">
+        <div>
+          <p class="card-role"></p>
+          <p class="card-company"></p>
+        </div>
+        <span class="card-badge"></span>
+      </div>
+      <p class="card-date"></p>
+      <div class="card-resume-row">
+        <span class="card-resume-chip hidden"></span>
+      </div>
+      <button class="card-expand-btn" type="button">Notes &amp; resume</button>
+      <div class="card-expand hidden">
+        <label class="field-label">Resume file used</label>
+        <input type="text" class="card-resume-input" placeholder="e.g. adarsh-resume-v3.pdf" />
+        <label class="field-label">Notes</label>
+        <textarea class="card-notes-input" rows="3" placeholder="Recruiter name, interview feedback…"></textarea>
+        <button class="card-save-btn" type="button">Save</button>
+      </div>
+      <select class="card-status-select">
+        <option value="applied">Applied</option>
+        <option value="interviewing">Interviewing</option>
+        <option value="offer">Offer</option>
+        <option value="rejected">Rejected</option>
+      </select>
+    </article>
+  </template>
+
+  <script src="dashboard.js" type="module"></script>
+</body>
+</html>

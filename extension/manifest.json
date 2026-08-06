@@ -1,0 +1,76 @@
+{
+  "manifest_version": 3,
+  "name": "Streakhire — Auto-track job applications",
+  "short_name": "Streakhire",
+  "version": "0.1.0",
+  "description": "Postmarks every job application the instant you hit submit. Your streak and pipeline update themselves.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1ntrJkH6UAHP8nXZiY1vFjZlUpxzijNemb3LaHNM4ck7FolcQgLCQLrir1S8lSRWsFV2BnQ3f4gOBkEyZD+BCYNwFCktk+GCbiZORwmlvp+znb54mrN7yWv6suhKDUg9nz1Pho0QL+IqP+FbP7LJNvuy+VYhhdXo0hY7YUl8xWKQ4GO0Bi4ykY27g7lhkvO3k7zgTEHwxKAWDUAmpV0SvJ/JBM/br5WqmFuqLEYKo3SANCOBc04eozXTXKD652mzoIlu9uDTS2/d12pwEfIuCB4VTDq8yZAl6K9dU5cdgTq390iqu4opq8QIx8mvq49vyQe6gGX2bcQomKAenZMWbQIDAQAB",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["identity", "storage", "activeTab", "scripting", "notifications", "alarms", "tabs"],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "https://*.greenhouse.io/*",
+    "https://*.lever.co/*",
+    "https://*.myworkdayjobs.com/*",
+    "https://www.irishjobs.ie/*",
+    "https://www.jobs.ie/*",
+    "https://publicjobs.ie/*",
+    "https://firestore.googleapis.com/*",
+    "https://identitytoolkit.googleapis.com/*",
+    "https://securetoken.googleapis.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["lib/detector-utils.js", "content-scripts/linkedin.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*.greenhouse.io/*"],
+      "js": ["lib/detector-utils.js", "content-scripts/greenhouse.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*.lever.co/*"],
+      "js": ["lib/detector-utils.js", "content-scripts/lever.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*.myworkdayjobs.com/*"],
+      "js": ["lib/detector-utils.js", "content-scripts/workday.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.irishjobs.ie/*", "https://www.jobs.ie/*", "https://publicjobs.ie/*"],
+      "js": ["lib/detector-utils.js", "content-scripts/generic.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "externally_connectable": {
+    "matches": [
+      "https://streakhire-web.azurewebsites.net/*",
+      "http://localhost/*"
+    ]
+  }
+}
