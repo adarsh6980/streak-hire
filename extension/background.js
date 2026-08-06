@@ -92,6 +92,18 @@ async function logApplication({ company, role, url, source, auto, resumeFileName
   ]);
 
   await updateBadge(nextStreak.current);
+
+  if (auto) {
+    chrome.notifications.create(`postmarked-${Date.now()}`, {
+      type: "basic",
+      iconUrl: "icons/icon128.png",
+      title: "Postmarked ✓",
+      message: `${created.role} at ${created.company} — streak: ${nextStreak.current} day${
+        nextStreak.current === 1 ? "" : "s"
+      }`,
+    });
+  }
+
   return { streak: nextStreak, application: created };
 }
 
@@ -258,7 +270,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ ok: false, error: `Unknown message type: ${message.type}` });
       }
     } catch (err) {
-      sendResponse({ ok: false, error: String(err.message || err) });
+      const errorMessage = String(err.message || err);
+      sendResponse({ ok: false, error: errorMessage });
+
+      // Auto-detection failures are otherwise silent — the person applying
+      // never has the popup open to see the error, so surface it directly.
+      if (message.type === "APPLICATION_DETECTED") {
+        chrome.notifications.create(`postmark-failed-${Date.now()}`, {
+          type: "basic",
+          iconUrl: "icons/icon128.png",
+          title: "Streakhire couldn't log that application",
+          message: errorMessage.includes("Not signed in")
+            ? "Sign in from the toolbar icon, then it'll catch the next one."
+            : errorMessage,
+        });
+      }
     }
   })();
   return true; // keep the message channel open for the async response
