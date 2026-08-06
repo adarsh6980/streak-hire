@@ -16,6 +16,15 @@ function markReported(dedupeKey) {
   sessionStorage.setItem("pounce_reported", JSON.stringify(list.slice(-20)));
 }
 
+// Lets the universal quick-confirm widget check whether a site-specific
+// detector (or an earlier manual confirm) already logged this exact page
+// this session, so it doesn't prompt for something already captured.
+window.pounceAlreadyReportedForThisPage = function alreadyReportedForThisPage() {
+  const seen = sessionStorage.getItem("pounce_reported") || "[]";
+  const list = JSON.parse(seen);
+  return list.some((key) => key.endsWith(`:${location.href}`));
+};
+
 // Best-effort: find the filename of whatever resume/CV the applicant
 // uploaded on this page. Browsers only ever expose the filename itself
 // (never the file path or contents) via input.files[i].name — that's a
@@ -61,4 +70,27 @@ window.pounceQueryText = function queryText(selectors) {
     if (text) return text;
   }
   return null;
+};
+
+// Generic, site-agnostic best-effort scrape of role/company from whatever
+// page the user is currently on — used by the universal quick-confirm
+// widget, which by definition has no site-specific selectors to rely on.
+window.pounceScrapeJobContext = function scrapeJobContext() {
+  const role =
+    window.pounceQueryText([
+      "h1",
+      "[class*='job-title' i]",
+      "[class*='jobtitle' i]",
+      "[data-testid*='title' i]",
+    ]) || document.title.split(/[-|·•]/)[0]?.trim();
+
+  const company =
+    window.pounceQueryText([
+      "[class*='company-name' i]",
+      "[class*='companyname' i]",
+      "[class*='employer' i]",
+      "[data-testid*='company' i]",
+    ]) || location.hostname.replace("www.", "").split(".")[0];
+
+  return { role, company };
 };
