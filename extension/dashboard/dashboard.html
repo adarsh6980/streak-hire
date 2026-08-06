@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>Streakhire — Dashboard</title>
+  <link rel="icon" href="../icons/icon32.png" />
   <link rel="stylesheet" href="dashboard.css" />
 </head>
 <body>
@@ -17,9 +18,14 @@
       </svg>
       <span>Streakhire</span>
     </div>
-    <div class="header-streak">
-      <span class="label">Current streak</span>
-      <span id="header-streak-count" class="header-streak-count">—</span>
+    <div class="header-actions">
+      <button id="export-btn" class="btn-secondary" type="button">Export CSV</button>
+      <button id="import-btn" class="btn-secondary" type="button">Import CSV</button>
+      <input id="import-file-input" type="file" accept=".csv" class="hidden" />
+      <div class="header-streak">
+        <span class="label">Current streak</span>
+        <span id="header-streak-count" class="header-streak-count">—</span>
+      </div>
     </div>
   </header>
 
@@ -44,16 +50,44 @@
       <ul id="followup-list" class="followup-list"></ul>
     </section>
 
-    <div class="board-toolbar">
-      <input
-        id="search-input"
-        type="text"
-        class="search-input"
-        placeholder="Search by role or company…"
-      />
+    <div class="toolbar">
+      <div class="filter-tabs" id="filter-tabs">
+        <button class="filter-tab active" data-status="all" type="button">
+          All <span class="filter-count" id="filtercount-all">0</span>
+        </button>
+        <button class="filter-tab" data-status="applied" type="button">
+          Applied <span class="filter-count" id="filtercount-applied">0</span>
+        </button>
+        <button class="filter-tab" data-status="interviewing" type="button">
+          Interviewing <span class="filter-count" id="filtercount-interviewing">0</span>
+        </button>
+        <button class="filter-tab" data-status="offer" type="button">
+          Offer <span class="filter-count" id="filtercount-offer">0</span>
+        </button>
+        <button class="filter-tab" data-status="rejected" type="button">
+          Rejected <span class="filter-count" id="filtercount-rejected">0</span>
+        </button>
+      </div>
+
+      <div class="toolbar-right">
+        <input
+          id="search-input"
+          type="text"
+          class="search-input"
+          placeholder="Search by role or company…"
+        />
+        <div class="view-toggle" id="view-toggle" role="group" aria-label="View">
+          <button class="view-toggle-btn active" data-view="list" type="button">List</button>
+          <button class="view-toggle-btn" data-view="board" type="button">Board</button>
+        </div>
+      </div>
     </div>
 
-    <section class="board">
+    <section id="list-view" class="list-view">
+      <div class="list-rows" id="list-rows"></div>
+    </section>
+
+    <section id="board-view" class="board hidden">
       <div class="board-column" data-status="applied">
         <h2 class="column-title">Applied <span class="column-count" id="count-applied">0</span></h2>
         <div class="column-cards" id="cards-applied"></div>
@@ -84,6 +118,24 @@
     <p id="no-results-state" class="empty-state hidden">No applications match that search.</p>
   </main>
 
+  <template id="row-template">
+    <article class="row" tabindex="0">
+      <div class="row-main">
+        <p class="row-role"></p>
+        <p class="row-company"></p>
+      </div>
+      <span class="row-resume-chip hidden"></span>
+      <span class="row-badge"></span>
+      <span class="row-date"></span>
+      <select class="row-status-select">
+        <option value="applied">Applied</option>
+        <option value="interviewing">Interviewing</option>
+        <option value="offer">Offer</option>
+        <option value="rejected">Rejected</option>
+      </select>
+    </article>
+  </template>
+
   <template id="card-template">
     <article class="card" tabindex="0">
       <div class="card-top">
@@ -106,7 +158,11 @@
 
   <div id="detail-overlay" class="detail-overlay hidden">
     <div class="detail-modal">
-      <button id="detail-close" class="detail-close" aria-label="Close" type="button">&times;</button>
+      <button id="detail-close" class="detail-close" aria-label="Close" type="button">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2 2L14 14M14 2L2 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+      </button>
 
       <div id="detail-view">
         <span id="detail-badge" class="card-badge"></span>

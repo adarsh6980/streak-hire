@@ -136,6 +136,23 @@ function scrapeCurrentPageForJobContext() {
     return null;
   }
 
+  function findCompanyFromProfileLink() {
+    const link = document.querySelector("a[href*='/company/']");
+    const text = link?.textContent?.trim();
+    return isValidCandidate(text) ? text : null;
+  }
+
+  function parseTitleForRoleAndCompany(title) {
+    if (!title) return { role: null, company: null };
+    let m = title.match(/^(.+?)\s+hiring\s+(.+?)(?:\s+in\s+.+)?\s*[|·-]/i);
+    if (m) return { company: m[1].trim(), role: m[2].trim() };
+    m = title.match(/^(.+?)\s+at\s+(.+?)\s*[|·-]/i);
+    if (m) return { role: m[1].trim(), company: m[2].trim() };
+    return { role: null, company: null };
+  }
+
+  const titleParsed = parseTitleForRoleAndCompany(document.title);
+
   const role =
     queryText([
       // LinkedIn
@@ -150,12 +167,16 @@ function scrapeCurrentPageForJobContext() {
       ".posting-headline h2",
       // Workday
       "[data-automation-id='jobPostingHeader']",
+    ]) ||
+    (isValidCandidate(titleParsed.role) ? titleParsed.role : null) ||
+    queryText([
       // Generic
       "[class*='job-title' i]",
       "[class*='jobtitle' i]",
       "[data-testid*='title' i]",
       "h1",
-    ]) || document.title.split(/[-|·•]/)[0]?.trim();
+    ]) ||
+    document.title.split(/[-|·•]/)[0]?.trim();
 
   const company =
     queryText([
@@ -168,12 +189,17 @@ function scrapeCurrentPageForJobContext() {
       ".company-name",
       "#header h2",
       ".job__company",
+    ]) ||
+    findCompanyFromProfileLink() ||
+    (isValidCandidate(titleParsed.company) ? titleParsed.company : null) ||
+    queryText([
       // Generic
       "[class*='company-name' i]",
       "[class*='companyname' i]",
       "[class*='employer' i]",
       "[data-testid*='company' i]",
-    ]) || location.hostname.replace("www.", "").split(".")[0];
+    ]) ||
+    location.hostname.replace("www.", "").split(".")[0];
 
   const descriptionRaw = queryText([
     ".job-details-jobs-unified-top-card__job-description",
@@ -209,6 +235,46 @@ async function scrapeAndLogActiveTab() {
   });
 
   return logApplication({ ...result, source: "manual-scrape", auto: false });
+}
+
+// Bulk import deliberately does NOT go through logApplication()/
+// applyStreakUpdate() — that function always stamps appliedAt as "right
+// now" and advances the streak by one day per call, which is correct for a
+// single real-time application but nonsensical for importing historical
+// records (100 imported rows would falsely jump the streak to 100 and
+// overwrite every appliedAt with today's date). Import preserves whatever
+// date each row actually carries and leaves the streak counter untouched;
+// the streak only ever reflects applications logged as they actually happen.
+async function importApplications(applications) {
+  const session = await getStoredSession();
+  if (!session) throw new Error("Not signed in");
+  const idToken = await getValidIdToken();
+
+  let imported = 0;
+  for (const app of applications) {
+    const parsedDate = app.appliedAt ? new Date(app.appliedAt) : new Date();
+    const appliedAt = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+
+    await addApplication(session.uid, idToken, {
+      company: app.company || "Unknown company",
+      role: app.role || "Unknown role",
+      description: app.description || null,
+      url: app.url || "",
+      source: "import",
+      auto: false,
+      status: ["applied", "interviewing", "offer", "rejected"].includes(app.status)
+        ? app.status
+        : "applied",
+      appliedAt,
+      resumeFileName: app.resumeFileName || null,
+      notes: app.notes || "",
+      followUpDone: false,
+      followUpNotifiedAt: null,
+    });
+    imported += 1;
+  }
+
+  return { imported };
 }
 
 async function listAllApplications(limit = 200) {
@@ -371,6 +437,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break;
         case "SCRAPE_AND_LOG_ACTIVE_TAB":
           sendResponse({ ok: true, data: await scrapeAndLogActiveTab() });
+          break;
+        case "IMPORT_APPLICATIONS":
+          sendResponse({ ok: true, data: await importApplications(message.payload.applications) });
           break;
         case "LIST_ALL_APPLICATIONS":
           sendResponse({ ok: true, data: await listAllApplications() });

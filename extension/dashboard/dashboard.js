@@ -16,14 +16,21 @@ function sendMessage(type, payload) {
 
 const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
 
+// Operate-mode motion rule (impeccable's operate.md): no orchestrated
+// page-load sequences on every refresh — only the very first paint gets the
+// staggered entrance. Every subsequent refresh (after a status change, edit,
+// delete, import) renders instantly; individual rows/cards get a one-shot
+// "stamped" pulse instead when *they specifically* changed.
+let hasAnimatedFirstLoad = false;
+
 function animateIn(el, index = 0) {
-  if (REDUCED_MOTION.matches) return;
+  if (REDUCED_MOTION.matches || hasAnimatedFirstLoad) return;
   el.animate(
     [
       { opacity: 0, transform: "translateY(8px)" },
       { opacity: 1, transform: "translateY(0)" },
     ],
-    { duration: 220, delay: Math.min(index, 8) * 30, easing: "ease-out", fill: "backwards" }
+    { duration: 200, delay: Math.min(index, 10) * 25, easing: "ease-out", fill: "backwards" }
   );
 }
 
@@ -43,10 +50,30 @@ function pulseStamp(el) {
 }
 
 const STATUSES = ["applied", "interviewing", "offer", "rejected"];
+
+const SOURCE_LABELS = {
+  linkedin: "LinkedIn",
+  greenhouse: "Greenhouse",
+  lever: "Lever",
+  workday: "Workday",
+  generic: "Web",
+  manual: "Manual",
+  "manual-scrape": "Scraped",
+  "quick-confirm": "Quick log",
+  import: "Imported",
+};
+
+function humanizeSource(app) {
+  return SOURCE_LABELS[app.source] || (app.auto ? "Auto" : "Manual");
+}
+
+const rowTemplate = document.getElementById("row-template");
 const cardTemplate = document.getElementById("card-template");
 
 let allApplications = [];
 let currentDetailId = null;
+let currentStatusFilter = "all";
+let currentView = localStorage.getItem("pounce_dashboard_view") || "list";
 
 function formatDate(iso) {
   const d = new Date(iso);
@@ -70,32 +97,80 @@ function findApp(id) {
   return allApplications.find((a) => a.id === id);
 }
 
-function buildCard(app, index) {
-  const node = cardTemplate.content.cloneNode(true);
-  const card = node.querySelector(".card");
-  card.dataset.id = app.id;
+function matchesSearch(app, query) {
+  if (!query) return true;
+  const haystack = `${app.role || ""} ${app.company || ""}`.toLowerCase();
+  return haystack.includes(query.toLowerCase());
+}
 
-  node.querySelector(".card-role").textContent = app.role || "Role";
-  node.querySelector(".card-company").textContent = app.company || "";
-  node.querySelector(".card-date").textContent = `Applied ${formatDate(app.appliedAt)}`;
-  node.querySelector(".card-badge").textContent = app.auto ? "auto" : app.source || "manual";
+function getFilteredApplications() {
+  const query = document.getElementById("search-input").value.trim();
+  return allApplications.filter(
+    (app) =>
+      matchesSearch(app, query) &&
+      (currentStatusFilter === "all" || app.status === currentStatusFilter)
+  );
+}
 
-  const resumeChip = node.querySelector(".card-resume-chip");
+async function updateStatus(app, newStatus, el) {
+  await sendMessage("UPDATE_APPLICATION_STATUS", { applicationId: app.id, status: newStatus });
+  pulseStamp(el);
+  await refresh();
+}
+
+function buildRow(app, index) {
+  const node = rowTemplate.content.cloneNode(true);
+  const row = node.querySelector(".row");
+  row.dataset.id = app.id;
+
+  row.querySelector(".row-role").textContent = app.role || "Role";
+  row.querySelector(".row-company").textContent = app.company || "";
+  row.querySelector(".row-date").textContent = formatDate(app.appliedAt);
+  row.querySelector(".row-badge").textContent = humanizeSource(app);
+
+  const resumeChip = row.querySelector(".row-resume-chip");
   if (app.resumeFileName) {
     resumeChip.textContent = app.resumeFileName;
     resumeChip.classList.remove("hidden");
   }
 
-  const statusSelect = node.querySelector(".card-status-select");
+  const statusSelect = row.querySelector(".row-status-select");
   statusSelect.value = app.status || "applied";
   statusSelect.addEventListener("click", (e) => e.stopPropagation());
-  statusSelect.addEventListener("change", async () => {
-    await sendMessage("UPDATE_APPLICATION_STATUS", {
-      applicationId: app.id,
-      status: statusSelect.value,
-    });
-    await refresh();
+  statusSelect.addEventListener("change", () => updateStatus(app, statusSelect.value, row));
+
+  row.addEventListener("click", () => openDetail(app.id));
+  row.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openDetail(app.id);
+    }
   });
+
+  requestAnimationFrame(() => animateIn(row, index));
+  return node;
+}
+
+function buildCard(app, index) {
+  const node = cardTemplate.content.cloneNode(true);
+  const card = node.querySelector(".card");
+  card.dataset.id = app.id;
+
+  card.querySelector(".card-role").textContent = app.role || "Role";
+  card.querySelector(".card-company").textContent = app.company || "";
+  card.querySelector(".card-date").textContent = `Applied ${formatDate(app.appliedAt)}`;
+  card.querySelector(".card-badge").textContent = humanizeSource(app);
+
+  const resumeChip = card.querySelector(".card-resume-chip");
+  if (app.resumeFileName) {
+    resumeChip.textContent = app.resumeFileName;
+    resumeChip.classList.remove("hidden");
+  }
+
+  const statusSelect = card.querySelector(".card-status-select");
+  statusSelect.value = app.status || "applied";
+  statusSelect.addEventListener("click", (e) => e.stopPropagation());
+  statusSelect.addEventListener("change", () => updateStatus(app, statusSelect.value, card));
 
   card.addEventListener("click", () => openDetail(app.id));
   card.addEventListener("keydown", (e) => {
@@ -109,16 +184,13 @@ function buildCard(app, index) {
   return node;
 }
 
-function matchesSearch(app, query) {
-  if (!query) return true;
-  const haystack = `${app.role || ""} ${app.company || ""}`.toLowerCase();
-  return haystack.includes(query.toLowerCase());
+function renderList(filtered) {
+  const container = document.getElementById("list-rows");
+  container.innerHTML = "";
+  filtered.forEach((app, i) => container.appendChild(buildRow(app, i)));
 }
 
-function renderBoard() {
-  const query = document.getElementById("search-input").value.trim();
-  const filtered = allApplications.filter((app) => matchesSearch(app, query));
-
+function renderBoardColumns(filtered) {
   const columns = { applied: [], interviewing: [], offer: [], rejected: [] };
   for (const app of filtered) {
     (columns[app.status] || columns.applied).push(app);
@@ -127,15 +199,50 @@ function renderBoard() {
   for (const status of STATUSES) {
     const container = document.getElementById(`cards-${status}`);
     container.innerHTML = "";
-    columns[status].forEach((app, i) => container.appendChild(buildCard(app, i)));
+    if (columns[status].length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "column-empty";
+      empty.textContent = "No applications here.";
+      container.appendChild(empty);
+    } else {
+      columns[status].forEach((app, i) => container.appendChild(buildCard(app, i)));
+    }
     document.getElementById(`count-${status}`).textContent = columns[status].length;
   }
+}
 
-  document.querySelector(".board").classList.toggle("hidden", allApplications.length === 0);
-  document.getElementById("empty-state").classList.toggle("hidden", allApplications.length > 0);
+function renderFilterCounts() {
+  document.getElementById("filtercount-all").textContent = allApplications.length;
+  for (const status of STATUSES) {
+    document.getElementById(`filtercount-${status}`).textContent = allApplications.filter(
+      (a) => a.status === status
+    ).length;
+  }
+}
+
+function render() {
+  const filtered = getFilteredApplications();
+
+  document.getElementById("list-view").classList.toggle("hidden", currentView !== "list");
+  document.getElementById("board-view").classList.toggle("hidden", currentView !== "board");
+
+  if (currentView === "list") {
+    renderList(filtered);
+  } else {
+    renderBoardColumns(filtered);
+  }
+
+  renderFilterCounts();
+  hasAnimatedFirstLoad = true;
+
+  const hasAny = allApplications.length > 0;
+  const searchActive = Boolean(document.getElementById("search-input").value.trim());
+  document.getElementById("list-view").classList.toggle("hidden", currentView !== "list" || !hasAny);
+  document.getElementById("board-view").classList.toggle("hidden", currentView !== "board" || !hasAny);
+  document.getElementById("empty-state").classList.toggle("hidden", hasAny);
   document
     .getElementById("no-results-state")
-    .classList.toggle("hidden", !(allApplications.length > 0 && filtered.length === 0 && query));
+    .classList.toggle("hidden", !(hasAny && filtered.length === 0));
 }
 
 function renderDigest(digest) {
@@ -171,6 +278,35 @@ function renderDigest(digest) {
   }
 }
 
+// --- Toolbar: filter tabs + view toggle ---
+
+document.getElementById("filter-tabs").addEventListener("click", (e) => {
+  const btn = e.target.closest(".filter-tab");
+  if (!btn) return;
+  currentStatusFilter = btn.dataset.status;
+  document
+    .querySelectorAll(".filter-tab")
+    .forEach((t) => t.classList.toggle("active", t === btn));
+  render();
+});
+
+document.getElementById("view-toggle").addEventListener("click", (e) => {
+  const btn = e.target.closest(".view-toggle-btn");
+  if (!btn) return;
+  currentView = btn.dataset.view;
+  localStorage.setItem("pounce_dashboard_view", currentView);
+  document
+    .querySelectorAll(".view-toggle-btn")
+    .forEach((t) => t.classList.toggle("active", t === btn));
+  render();
+});
+
+document.querySelectorAll(".view-toggle-btn").forEach((btn) => {
+  btn.classList.toggle("active", btn.dataset.view === currentView);
+});
+
+document.getElementById("search-input").addEventListener("input", render);
+
 // --- Detail modal ---
 
 const detailEls = {
@@ -197,6 +333,11 @@ const detailEls = {
   editDescription: document.getElementById("edit-description"),
 };
 
+let editFormDirty = false;
+[detailEls.editRole, detailEls.editCompany, detailEls.editResume, detailEls.editNotes, detailEls.editDescription].forEach(
+  (el) => el.addEventListener("input", () => (editFormDirty = true))
+);
+
 function openDetail(id) {
   const app = findApp(id);
   if (!app) return;
@@ -205,19 +346,23 @@ function openDetail(id) {
   detailEls.overlay.classList.remove("hidden");
 }
 
-function closeDetail() {
+function closeDetail({ skipConfirm = false } = {}) {
+  if (!skipConfirm && !detailEls.editForm.classList.contains("hidden") && editFormDirty) {
+    if (!window.confirm("Discard unsaved changes?")) return;
+  }
   detailEls.overlay.classList.add("hidden");
   detailEls.editForm.classList.add("hidden");
   detailEls.view.classList.remove("hidden");
+  editFormDirty = false;
   currentDetailId = null;
 }
 
 function renderDetailView(app) {
-  detailEls.badge.textContent = app.auto ? "auto" : app.source || "manual";
+  detailEls.badge.textContent = humanizeSource(app);
   detailEls.role.textContent = app.role || "Role";
   detailEls.company.textContent = app.company || "";
   detailEls.date.textContent = `Applied ${formatFullDate(app.appliedAt)}`;
-  detailEls.source.textContent = app.source ? `via ${app.source}` : "";
+  detailEls.source.textContent = app.source ? `via ${humanizeSource(app)}` : "";
 
   if (app.url) {
     detailEls.url.href = app.url;
@@ -242,11 +387,12 @@ function openEditMode() {
   detailEls.editResume.value = app.resumeFileName || "";
   detailEls.editNotes.value = app.notes || "";
   detailEls.editDescription.value = app.description || "";
+  editFormDirty = false;
   detailEls.view.classList.add("hidden");
   detailEls.editForm.classList.remove("hidden");
 }
 
-detailEls.closeBtn.addEventListener("click", closeDetail);
+detailEls.closeBtn.addEventListener("click", () => closeDetail());
 detailEls.overlay.addEventListener("click", (e) => {
   if (e.target === detailEls.overlay) closeDetail();
 });
@@ -256,6 +402,8 @@ document.addEventListener("keydown", (e) => {
 
 detailEls.editBtn.addEventListener("click", openEditMode);
 detailEls.cancelBtn.addEventListener("click", () => {
+  if (editFormDirty && !window.confirm("Discard unsaved changes?")) return;
+  editFormDirty = false;
   const app = findApp(currentDetailId);
   if (app) renderDetailView(app);
 });
@@ -271,6 +419,7 @@ detailEls.editForm.addEventListener("submit", async (e) => {
     notes: detailEls.editNotes.value.trim(),
     description: detailEls.editDescription.value.trim() || null,
   });
+  editFormDirty = false;
   pulseStamp(detailEls.overlay.querySelector(".detail-modal"));
   await refresh();
   const app = findApp(currentDetailId);
@@ -286,27 +435,164 @@ detailEls.deleteBtn.addEventListener("click", async () => {
   if (!confirmed) return;
 
   await sendMessage("DELETE_APPLICATION", { applicationId: currentDetailId });
-  closeDetail();
+  closeDetail({ skipConfirm: true });
   await refresh();
+});
+
+// --- CSV export / import ---
+// CSV is the universal interchange format Excel, Google Sheets, and Notion
+// all natively import/export — one format covers all three rather than
+// building three separate API integrations (each of which would need its
+// own OAuth consent screen, same setup burden as the Google sign-in flow).
+
+const CSV_COLUMNS = [
+  "role",
+  "company",
+  "status",
+  "appliedAt",
+  "source",
+  "resumeFileName",
+  "notes",
+  "description",
+  "url",
+];
+
+function csvEscape(value) {
+  const str = String(value ?? "");
+  if (/[",\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function buildCsv(applications) {
+  const header = CSV_COLUMNS.join(",");
+  const rows = applications.map((app) =>
+    CSV_COLUMNS.map((col) => csvEscape(app[col])).join(",")
+  );
+  return [header, ...rows].join("\r\n");
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (inQuotes) {
+      if (char === '"' && text[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (char === '"') {
+        inQuotes = false;
+      } else {
+        field += char;
+      }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ",") {
+      row.push(field);
+      field = "";
+    } else if (char === "\n" || char === "\r") {
+      if (char === "\r" && text[i + 1] === "\n") i++;
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += char;
+    }
+  }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows.filter((r) => r.some((cell) => cell.trim() !== ""));
+}
+
+document.getElementById("export-btn").addEventListener("click", () => {
+  const csv = buildCsv(allApplications);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `streakhire-applications-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+const importInput = document.getElementById("import-file-input");
+document.getElementById("import-btn").addEventListener("click", () => importInput.click());
+
+importInput.addEventListener("change", async () => {
+  const file = importInput.files?.[0];
+  importInput.value = "";
+  if (!file) return;
+
+  const text = await file.text();
+  const rows = parseCsv(text);
+  if (rows.length < 2) {
+    window.alert("That CSV doesn't look like it has any data rows.");
+    return;
+  }
+
+  const header = rows[0].map((h) => h.trim().toLowerCase());
+  const dataRows = rows.slice(1);
+
+  const applications = dataRows.map((cells) => {
+    const record = {};
+    header.forEach((col, i) => {
+      record[col] = cells[i] ?? "";
+    });
+    return {
+      role: record.role || record.title || "Unknown role",
+      company: record.company || "Unknown company",
+      status: STATUSES.includes(record.status) ? record.status : "applied",
+      appliedAt: record.appliedat || record["applied date"] || null,
+      source: "import",
+      resumeFileName: record.resumefilename || record["resume file"] || null,
+      notes: record.notes || "",
+      description: record.description || null,
+      url: record.url || "",
+    };
+  });
+
+  const confirmed = window.confirm(
+    `Import ${applications.length} application${applications.length === 1 ? "" : "s"}? This won't affect your streak — streak only counts what you apply to going forward.`
+  );
+  if (!confirmed) return;
+
+  const result = await sendMessage("IMPORT_APPLICATIONS", { applications });
+  await refresh();
+  pulseStamp(document.querySelector(".digest-bar"));
+  window.alert(`Imported ${result.imported} application${result.imported === 1 ? "" : "s"}.`);
 });
 
 // --- Bootstrap ---
 
-document.getElementById("search-input").addEventListener("input", renderBoard);
-
 async function refresh() {
-  const [state, applications, digest] = await Promise.all([
-    sendMessage("GET_STATE"),
-    sendMessage("LIST_ALL_APPLICATIONS"),
-    sendMessage("GET_DIGEST"),
-  ]);
+  const main = document.querySelector(".main");
+  main.style.opacity = "0.6";
+  try {
+    const [state, applications, digest] = await Promise.all([
+      sendMessage("GET_STATE"),
+      sendMessage("LIST_ALL_APPLICATIONS"),
+      sendMessage("GET_DIGEST"),
+    ]);
 
-  const streak = state.streak?.current || 0;
-  document.getElementById("header-streak-count").textContent = `${streak} day${streak === 1 ? "" : "s"}`;
+    const streak = state.streak?.current || 0;
+    document.getElementById("header-streak-count").textContent = `${streak} day${streak === 1 ? "" : "s"}`;
 
-  allApplications = applications;
-  renderBoard();
-  renderDigest(digest);
+    allApplications = applications;
+    render();
+    renderDigest(digest);
+  } finally {
+    main.style.opacity = "1";
+  }
 }
 
 refresh().catch((err) => {

@@ -12,6 +12,11 @@
   --stamp-dark: #9c2f15;
   --airmail: #1f3f6b;
   --offer: #2f6b45;
+  /* Space Mono isn't bundled in the extension (no font-file vendoring yet,
+     no network font loading — an intentional Operate-mode adaptation of
+     DESIGN.md's Mono-Means-System Rule, not a lapse of it). Courier New is
+     the closest universally-available system monospace. */
+  --font-mono: "Courier New", monospace;
 }
 
 body {
@@ -40,8 +45,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 40px;
+  padding: 18px 40px;
   border-bottom: 1px solid rgba(33, 26, 18, 0.1);
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .brand {
@@ -58,8 +65,17 @@ body {
   color: var(--stamp);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .header-streak {
   text-align: right;
+  margin-left: 8px;
+  padding-left: 16px;
+  border-left: 1px solid rgba(33, 26, 18, 0.12);
 }
 
 .header-streak .label {
@@ -68,12 +84,12 @@ body {
 
 .header-streak-count {
   font-weight: 700;
-  font-size: 22px;
+  font-size: 20px;
   display: inline-block;
 }
 
 .label {
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -83,7 +99,8 @@ body {
 .main {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 40px 80px;
+  padding: 28px 40px 80px;
+  transition: opacity 0.15s ease;
 }
 
 .digest-bar {
@@ -142,7 +159,7 @@ body {
 }
 
 .followup-item-btn {
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
   background: none;
@@ -153,16 +170,66 @@ body {
   white-space: nowrap;
 }
 
-.board-toolbar {
+/* Toolbar: status filter tabs (left) + search & view toggle (right).
+   Replaces the fixed 4-column board as the default surface — a dense,
+   filterable list is the Operate-mode-correct answer to "this needs to
+   hold 100+ rows," where a 4-up Kanban column reads as broken instead. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 16px;
 }
 
+.filter-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--paper-light);
+  border: 1px solid rgba(33, 26, 18, 0.12);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.filter-tab {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: none;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.filter-tab.active {
+  background: var(--stamp);
+  color: var(--paper-light);
+}
+
+.filter-count {
+  opacity: 0.75;
+  font-size: 10px;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .search-input {
-  width: 100%;
-  max-width: 360px;
+  width: 220px;
   font-family: inherit;
   font-size: 13px;
-  padding: 9px 12px;
+  padding: 8px 12px;
   border-radius: 999px;
   border: 1px solid rgba(33, 26, 18, 0.18);
   background: var(--paper-light);
@@ -173,6 +240,165 @@ body {
   outline: 2px solid var(--stamp);
   outline-offset: 1px;
 }
+
+.view-toggle {
+  display: flex;
+  background: var(--paper-light);
+  border: 1px solid rgba(33, 26, 18, 0.12);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.view-toggle-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+
+.view-toggle-btn.active {
+  background: var(--ink);
+  color: var(--paper-light);
+}
+
+/* --- List view (default) --- */
+
+.list-view {
+  background: var(--paper-light);
+  border: 1px solid rgba(33, 26, 18, 0.12);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.list-rows {
+  max-height: calc(100vh - 380px);
+  min-height: 120px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--kraft) transparent;
+}
+
+.list-rows::-webkit-scrollbar {
+  width: 6px;
+}
+
+.list-rows::-webkit-scrollbar-thumb {
+  background: var(--kraft);
+  border-radius: 999px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(33, 26, 18, 0.08);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover,
+.row:focus-visible {
+  background: rgba(200, 64, 31, 0.06);
+  outline: none;
+}
+
+.row-main {
+  min-width: 0;
+}
+
+.row-role {
+  font-weight: 700;
+  font-size: 13px;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-company {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 1px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-resume-chip {
+  font-size: 10px;
+  background: rgba(31, 63, 107, 0.1);
+  color: var(--airmail);
+  border-radius: 6px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.row-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--stamp);
+  border: 1px solid var(--stamp);
+  border-radius: 999px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.row-date {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-soft);
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.row-status-select {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(33, 26, 18, 0.18);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "main badge"
+      "resume resume"
+      "date status";
+    row-gap: 6px;
+  }
+  .row-badge {
+    grid-area: badge;
+  }
+  .row-resume-chip {
+    grid-area: resume;
+  }
+  .row-date {
+    grid-area: date;
+  }
+  .row-status-select {
+    grid-area: status;
+  }
+}
+
+/* --- Board view (optional, toggled) --- */
 
 .board {
   display: grid;
@@ -185,7 +411,7 @@ body {
     grid-template-columns: 1fr;
   }
   .column-cards {
-    max-height: 480px !important;
+    max-height: 420px !important;
   }
 }
 
@@ -199,21 +425,18 @@ body {
 }
 
 .column-count {
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-weight: 400;
   font-size: 11px;
   color: var(--ink-soft);
 }
 
-/* Fixes the "100 applications in one endless column" problem: each column
-   scrolls independently within a bounded height instead of the whole page
-   growing without limit. */
 .column-cards {
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-height: 40px;
-  max-height: calc(100vh - 340px);
+  max-height: calc(100vh - 380px);
   overflow-y: auto;
   padding-right: 4px;
   scrollbar-width: thin;
@@ -227,6 +450,14 @@ body {
 .column-cards::-webkit-scrollbar-thumb {
   background: var(--kraft);
   border-radius: 999px;
+}
+
+.column-empty {
+  font-size: 11px;
+  color: var(--ink-soft);
+  opacity: 0.6;
+  padding: 10px 2px;
+  font-style: italic;
 }
 
 .card {
@@ -274,7 +505,7 @@ body {
 }
 
 .card-badge {
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   text-transform: uppercase;
   color: var(--stamp);
@@ -286,7 +517,7 @@ body {
 }
 
 .card-date {
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--ink-soft);
   opacity: 0.7;
@@ -306,7 +537,7 @@ body {
 .card-status-select {
   margin-top: 8px;
   width: 100%;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
   padding: 6px 8px;
@@ -359,15 +590,18 @@ body {
 
 .detail-close {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: 16px;
+  right: 16px;
   background: none;
   border: none;
-  font-size: 22px;
-  line-height: 1;
   cursor: pointer;
   color: var(--ink-soft);
-  padding: 4px;
+  padding: 6px;
+  display: flex;
+}
+
+.detail-close:hover {
+  color: var(--stamp);
 }
 
 .detail-role {
@@ -388,7 +622,7 @@ body {
   gap: 12px;
   align-items: center;
   margin-top: 12px;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink-soft);
 }
@@ -443,7 +677,7 @@ body {
 }
 
 .field-label {
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
   color: var(--ink-soft);
@@ -455,7 +689,7 @@ body {
   border: none;
   border-radius: 999px;
   padding: 9px 18px;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   text-transform: uppercase;
   cursor: pointer;
@@ -466,22 +700,26 @@ body {
 }
 
 .btn-secondary {
-  background: var(--paper);
+  background: var(--paper-light);
   color: var(--ink);
   border: 1px solid rgba(33, 26, 18, 0.2);
   border-radius: 999px;
-  padding: 9px 18px;
-  font-family: "Courier New", monospace;
-  font-size: 12px;
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   text-transform: uppercase;
   cursor: pointer;
+}
+
+.btn-secondary:hover {
+  border-color: var(--ink);
 }
 
 .btn-ghost {
   background: none;
   border: none;
   color: var(--ink-soft);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   text-transform: uppercase;
   cursor: pointer;
@@ -494,7 +732,7 @@ body {
   color: var(--stamp);
   border-radius: 999px;
   padding: 9px 18px;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   text-transform: uppercase;
   cursor: pointer;

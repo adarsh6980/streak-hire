@@ -71,15 +71,41 @@ window.pounceQueryText = function queryText(selectors) {
   return null;
 };
 
+// CSS class names drift with every redesign a job site ships — we've now
+// been burned twice guessing LinkedIn's. These two helpers use signals that
+// are much more stable than a class name: LinkedIn always links a job's
+// employer to a URL under "/company/" regardless of styling, and a job
+// page's <title> is SEO content the site has real incentive not to break,
+// usually shaped "<Role> at <Company>" or "<Company> hiring <Role>".
+function findCompanyFromProfileLink() {
+  const link = document.querySelector("a[href*='/company/']");
+  const text = link?.textContent?.trim();
+  return isValidCandidate(text) ? text : null;
+}
+
+function parseTitleForRoleAndCompany(title) {
+  if (!title) return { role: null, company: null };
+  // "Lette hiring Product Engineer in Ireland | LinkedIn"
+  let m = title.match(/^(.+?)\s+hiring\s+(.+?)(?:\s+in\s+.+)?\s*[|·-]/i);
+  if (m) return { company: m[1].trim(), role: m[2].trim() };
+  // "Product Engineer at Lette | LinkedIn" / "Product Engineer - Lette"
+  m = title.match(/^(.+?)\s+at\s+(.+?)\s*[|·-]/i);
+  if (m) return { role: m[1].trim(), company: m[2].trim() };
+  return { role: null, company: null };
+}
+
 // One shared, priority-ordered scrape used by the universal widget and (as
 // a duplicated-but-synced copy, see background.js's
 // scrapeCurrentPageForJobContext) the popup's on-demand scrape button.
 // Site-specific selectors for every detector we ship come first — copied
-// from each site's own content-script — generic fallbacks come last, and a
-// bare "h1" is the very last resort rather than the first attempt, which is
-// what previously let LinkedIn's nav/notification markup get picked up
-// instead of the real job title.
+// from each site's own content-script — then the structural/title-parsing
+// fallbacks above, then generic class-name guesses, with a bare "h1" (role)
+// or the bare hostname (company) as the very last resort rather than the
+// first attempt, which is what previously let LinkedIn's nav/notification
+// markup get picked up instead of the real job title and company.
 window.pounceScrapeJobContext = function scrapeJobContext() {
+  const titleParsed = parseTitleForRoleAndCompany(document.title);
+
   const role =
     window.pounceQueryText([
       // LinkedIn
@@ -94,12 +120,16 @@ window.pounceScrapeJobContext = function scrapeJobContext() {
       ".posting-headline h2",
       // Workday
       "[data-automation-id='jobPostingHeader']",
+    ]) ||
+    (isValidCandidate(titleParsed.role) ? titleParsed.role : null) ||
+    window.pounceQueryText([
       // Generic
       "[class*='job-title' i]",
       "[class*='jobtitle' i]",
       "[data-testid*='title' i]",
       "h1",
-    ]) || document.title.split(/[-|·•]/)[0]?.trim();
+    ]) ||
+    document.title.split(/[-|·•]/)[0]?.trim();
 
   const company =
     window.pounceQueryText([
@@ -112,12 +142,17 @@ window.pounceScrapeJobContext = function scrapeJobContext() {
       ".company-name",
       "#header h2",
       ".job__company",
+    ]) ||
+    findCompanyFromProfileLink() ||
+    (isValidCandidate(titleParsed.company) ? titleParsed.company : null) ||
+    window.pounceQueryText([
       // Generic
       "[class*='company-name' i]",
       "[class*='companyname' i]",
       "[class*='employer' i]",
       "[data-testid*='company' i]",
-    ]) || location.hostname.replace("www.", "").split(".")[0];
+    ]) ||
+    location.hostname.replace("www.", "").split(".")[0];
 
   const descriptionRaw = window.pounceQueryText([
     // LinkedIn
