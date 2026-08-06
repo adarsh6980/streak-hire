@@ -34,6 +34,8 @@ const els = {
   recentEmpty: document.getElementById("recent-empty"),
   statusText: document.getElementById("status-text"),
   openDashboardBtn: document.getElementById("open-dashboard-btn"),
+  scrapeLogBtn: document.getElementById("scrape-log-btn"),
+  scrapeStatus: document.getElementById("scrape-status"),
 };
 
 const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -134,6 +136,26 @@ els.signInBtn.addEventListener("click", async () => {
 els.signOutBtn.addEventListener("click", async () => {
   await sendMessage("SIGN_OUT");
   await refresh();
+});
+
+els.scrapeLogBtn.addEventListener("click", async () => {
+  els.scrapeLogBtn.disabled = true;
+  els.scrapeLogBtn.textContent = "Scraping this page…";
+  els.scrapeStatus.classList.remove("hidden");
+  els.scrapeStatus.textContent = "";
+  try {
+    const result = await sendMessage("SCRAPE_AND_LOG_ACTIVE_TAB");
+    els.scrapeStatus.textContent = `Postmarked: ${result.application.role} at ${result.application.company}`;
+    await refresh();
+  } catch (err) {
+    const message = String(err.message || err);
+    els.scrapeStatus.textContent = message.includes("Not signed in")
+      ? "Sign in first, then try again."
+      : message;
+  } finally {
+    els.scrapeLogBtn.disabled = false;
+    els.scrapeLogBtn.textContent = "Missed one? Scrape this page & log it";
+  }
 });
 
 els.manualLogBtn.addEventListener("click", () => {

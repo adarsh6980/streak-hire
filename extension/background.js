@@ -107,6 +107,62 @@ async function logApplication({ company, role, url, source, auto, resumeFileName
   return { streak: nextStreak, application: created };
 }
 
+// Self-contained on purpose: chrome.scripting.executeScript serializes this
+// function and runs it inside the target tab's page context, so it can't
+// reference anything from this file's scope (imports, other functions,
+// constants) — only what's declared inside it.
+function scrapeCurrentPageForJobContext() {
+  function queryText(selectors) {
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      const text = el?.textContent?.trim();
+      if (text) return text;
+    }
+    return null;
+  }
+
+  const role =
+    queryText([
+      "h1",
+      "[class*='job-title' i]",
+      "[class*='jobtitle' i]",
+      "[data-testid*='title' i]",
+    ]) || document.title.split(/[-|·•]/)[0]?.trim();
+
+  const company =
+    queryText([
+      "[class*='company-name' i]",
+      "[class*='companyname' i]",
+      "[class*='employer' i]",
+      "[data-testid*='company' i]",
+    ]) || location.hostname.replace("www.", "").split(".")[0];
+
+  const fileInputs = Array.from(document.querySelectorAll("input[type='file']"));
+  const withFiles = fileInputs.filter((el) => el.files && el.files.length > 0);
+  const resumeLike = withFiles.find((el) => {
+    const haystack = `${el.name} ${el.id} ${el.getAttribute("aria-label") || ""}`.toLowerCase();
+    return /resume|cv/.test(haystack);
+  });
+  const resumeFileName = (resumeLike || withFiles[0])?.files[0]?.name || null;
+
+  return { role, company, url: location.href, resumeFileName };
+}
+
+async function scrapeAndLogActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) throw new Error("No active tab found");
+  if (!/^https?:/.test(tab.url || "")) {
+    throw new Error("This page can't be scraped (not a regular web page)");
+  }
+
+  const [{ result }] = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: scrapeCurrentPageForJobContext,
+  });
+
+  return logApplication({ ...result, source: "manual-scrape", auto: false });
+}
+
 async function listAllApplications(limit = 200) {
   const session = await getStoredSession();
   if (!session) throw new Error("Not signed in");
@@ -246,6 +302,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               auto: message.type === "APPLICATION_DETECTED",
             }),
           });
+          break;
+        case "SCRAPE_AND_LOG_ACTIVE_TAB":
+          sendResponse({ ok: true, data: await scrapeAndLogActiveTab() });
           break;
         case "LIST_ALL_APPLICATIONS":
           sendResponse({ ok: true, data: await listAllApplications() });

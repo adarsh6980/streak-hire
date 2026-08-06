@@ -215,6 +215,14 @@ body {
   margin-top: 14px;
 }
 
+.log-section .btn-primary {
+  margin-bottom: 8px;
+}
+
+.log-section .fineprint {
+  margin: 0 0 8px;
+}
+
 .manual-form {
   margin-top: 8px;
   display: flex;
