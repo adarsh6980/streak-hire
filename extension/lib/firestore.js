@@ -140,3 +140,32 @@ export async function listRecentApplications(uid, idToken, limit = 10) {
     ...fromFirestoreFields(d.fields || {}),
   }));
 }
+
+// Timeline events live in a subcollection under each application doc
+// (users/{uid}/applications/{applicationId}/timeline), not as a top-level
+// collection — mirrors how `applications` nests under `users`.
+export async function addTimelineEvent(uid, idToken, applicationId, event) {
+  const doc = await firestoreFetch(
+    `/users/${uid}/applications/${applicationId}/timeline`,
+    {
+      method: "POST",
+      idToken,
+      body: { fields: toFirestoreFields(event) },
+    }
+  );
+  return { id: idFromDocName(doc.name), ...event };
+}
+
+export async function listTimeline(uid, idToken, applicationId) {
+  const doc = await firestoreFetch(
+    `/users/${uid}/applications/${applicationId}/timeline`,
+    {
+      idToken,
+      query: `?orderBy=detectedAt%20desc`,
+    }
+  );
+  return (doc.documents || []).map((d) => ({
+    id: idFromDocName(d.name),
+    ...fromFirestoreFields(d.fields || {}),
+  }));
+}

@@ -49,7 +49,7 @@ function pulseStamp(el) {
   );
 }
 
-const STATUSES = ["applied", "interviewing", "offer", "rejected"];
+const STATUSES = ["applied", "received", "assessment", "interview", "offer", "rejected", "withdrawn"];
 
 const SOURCE_LABELS = {
   linkedin: "LinkedIn",
@@ -191,7 +191,7 @@ function renderList(filtered) {
 }
 
 function renderBoardColumns(filtered) {
-  const columns = { applied: [], interviewing: [], offer: [], rejected: [] };
+  const columns = Object.fromEntries(STATUSES.map((status) => [status, []]));
   for (const app of filtered) {
     (columns[app.status] || columns.applied).push(app);
   }
@@ -320,6 +320,12 @@ const detailEls = {
   source: document.getElementById("detail-source"),
   url: document.getElementById("detail-url"),
   resume: document.getElementById("detail-resume"),
+  location: document.getElementById("detail-location"),
+  salary: document.getElementById("detail-salary"),
+  applicationId: document.getElementById("detail-application-id"),
+  jobPortal: document.getElementById("detail-job-portal"),
+  recruiter: document.getElementById("detail-recruiter"),
+  importantLinks: document.getElementById("detail-important-links"),
   notes: document.getElementById("detail-notes"),
   description: document.getElementById("detail-description"),
   editBtn: document.getElementById("detail-edit-btn"),
@@ -329,14 +335,32 @@ const detailEls = {
   editRole: document.getElementById("edit-role"),
   editCompany: document.getElementById("edit-company"),
   editResume: document.getElementById("edit-resume"),
+  editLocation: document.getElementById("edit-location"),
+  editSalary: document.getElementById("edit-salary"),
+  editApplicationId: document.getElementById("edit-application-id"),
+  editJobPortal: document.getElementById("edit-job-portal"),
+  editRecruiterName: document.getElementById("edit-recruiter-name"),
+  editRecruiterEmail: document.getElementById("edit-recruiter-email"),
+  editImportantLinks: document.getElementById("edit-important-links"),
   editNotes: document.getElementById("edit-notes"),
   editDescription: document.getElementById("edit-description"),
 };
 
 let editFormDirty = false;
-[detailEls.editRole, detailEls.editCompany, detailEls.editResume, detailEls.editNotes, detailEls.editDescription].forEach(
-  (el) => el.addEventListener("input", () => (editFormDirty = true))
-);
+[
+  detailEls.editRole,
+  detailEls.editCompany,
+  detailEls.editResume,
+  detailEls.editLocation,
+  detailEls.editSalary,
+  detailEls.editApplicationId,
+  detailEls.editJobPortal,
+  detailEls.editRecruiterName,
+  detailEls.editRecruiterEmail,
+  detailEls.editImportantLinks,
+  detailEls.editNotes,
+  detailEls.editDescription,
+].forEach((el) => el.addEventListener("input", () => (editFormDirty = true)));
 
 function openDetail(id) {
   const app = findApp(id);
@@ -372,6 +396,42 @@ function renderDetailView(app) {
   }
 
   detailEls.resume.textContent = app.resumeFileName || "Not captured";
+  detailEls.location.textContent = app.location ?? "Not captured";
+  detailEls.salary.textContent = app.salary ?? "Not captured";
+  detailEls.applicationId.textContent = app.applicationId ?? "Not captured";
+  detailEls.jobPortal.textContent = app.jobPortal ?? "Not captured";
+
+  const recruiterName = app.recruiterName ?? "";
+  const recruiterEmail = app.recruiterEmail ?? "";
+  detailEls.recruiter.textContent =
+    recruiterName || recruiterEmail
+      ? `${recruiterName}${recruiterName && recruiterEmail ? " — " : ""}${recruiterEmail}`
+      : "Not captured";
+
+  detailEls.importantLinks.innerHTML = "";
+  const links = Array.isArray(app.importantLinks) ? app.importantLinks : [];
+  if (links.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No links added.";
+    detailEls.importantLinks.appendChild(li);
+  } else {
+    for (const link of links) {
+      // importantLinks entries are plain URL strings (or, defensively,
+      // {label, url} objects if a future writer uses that shape).
+      const url = typeof link === "string" ? link : link?.url ?? "";
+      const label = typeof link === "string" ? link : link?.label || link?.url || "";
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noreferrer";
+      a.className = "detail-link";
+      a.textContent = label;
+      li.appendChild(a);
+      detailEls.importantLinks.appendChild(li);
+    }
+  }
+
   detailEls.notes.textContent = app.notes || "No notes yet.";
   detailEls.description.textContent = app.description || "No description captured for this application.";
 
@@ -385,6 +445,17 @@ function openEditMode() {
   detailEls.editRole.value = app.role || "";
   detailEls.editCompany.value = app.company || "";
   detailEls.editResume.value = app.resumeFileName || "";
+  detailEls.editLocation.value = app.location ?? "";
+  detailEls.editSalary.value = app.salary ?? "";
+  detailEls.editApplicationId.value = app.applicationId ?? "";
+  detailEls.editJobPortal.value = app.jobPortal ?? "";
+  detailEls.editRecruiterName.value = app.recruiterName ?? "";
+  detailEls.editRecruiterEmail.value = app.recruiterEmail ?? "";
+  detailEls.editImportantLinks.value = Array.isArray(app.importantLinks)
+    ? app.importantLinks
+        .map((link) => (typeof link === "string" ? link : link?.url ?? ""))
+        .join("\n")
+    : "";
   detailEls.editNotes.value = app.notes || "";
   detailEls.editDescription.value = app.description || "";
   editFormDirty = false;
@@ -411,11 +482,23 @@ detailEls.cancelBtn.addEventListener("click", () => {
 detailEls.editForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!currentDetailId) return;
+  const importantLinks = detailEls.editImportantLinks.value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
   await sendMessage("UPDATE_APPLICATION_DETAILS", {
     applicationId: currentDetailId,
     role: detailEls.editRole.value.trim(),
     company: detailEls.editCompany.value.trim(),
     resumeFileName: detailEls.editResume.value.trim() || null,
+    location: detailEls.editLocation.value.trim() || null,
+    salary: detailEls.editSalary.value.trim() || null,
+    externalApplicationId: detailEls.editApplicationId.value.trim() || null,
+    jobPortal: detailEls.editJobPortal.value.trim() || null,
+    recruiterName: detailEls.editRecruiterName.value.trim() || null,
+    recruiterEmail: detailEls.editRecruiterEmail.value.trim() || null,
+    importantLinks,
     notes: detailEls.editNotes.value.trim(),
     description: detailEls.editDescription.value.trim() || null,
   });

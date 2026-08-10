@@ -58,14 +58,23 @@
         <button class="filter-tab" data-status="applied" type="button">
           Applied <span class="filter-count" id="filtercount-applied">0</span>
         </button>
-        <button class="filter-tab" data-status="interviewing" type="button">
-          Interviewing <span class="filter-count" id="filtercount-interviewing">0</span>
+        <button class="filter-tab" data-status="received" type="button">
+          Received <span class="filter-count" id="filtercount-received">0</span>
+        </button>
+        <button class="filter-tab" data-status="assessment" type="button">
+          Assessment <span class="filter-count" id="filtercount-assessment">0</span>
+        </button>
+        <button class="filter-tab" data-status="interview" type="button">
+          Interview <span class="filter-count" id="filtercount-interview">0</span>
         </button>
         <button class="filter-tab" data-status="offer" type="button">
           Offer <span class="filter-count" id="filtercount-offer">0</span>
         </button>
         <button class="filter-tab" data-status="rejected" type="button">
           Rejected <span class="filter-count" id="filtercount-rejected">0</span>
+        </button>
+        <button class="filter-tab" data-status="withdrawn" type="button">
+          Withdrawn <span class="filter-count" id="filtercount-withdrawn">0</span>
         </button>
       </div>
 
@@ -92,9 +101,17 @@
         <h2 class="column-title">Applied <span class="column-count" id="count-applied">0</span></h2>
         <div class="column-cards" id="cards-applied"></div>
       </div>
-      <div class="board-column" data-status="interviewing">
-        <h2 class="column-title">Interviewing <span class="column-count" id="count-interviewing">0</span></h2>
-        <div class="column-cards" id="cards-interviewing"></div>
+      <div class="board-column" data-status="received">
+        <h2 class="column-title">Received <span class="column-count" id="count-received">0</span></h2>
+        <div class="column-cards" id="cards-received"></div>
+      </div>
+      <div class="board-column" data-status="assessment">
+        <h2 class="column-title">Assessment <span class="column-count" id="count-assessment">0</span></h2>
+        <div class="column-cards" id="cards-assessment"></div>
+      </div>
+      <div class="board-column" data-status="interview">
+        <h2 class="column-title">Interview <span class="column-count" id="count-interview">0</span></h2>
+        <div class="column-cards" id="cards-interview"></div>
       </div>
       <div class="board-column" data-status="offer">
         <h2 class="column-title">Offer <span class="column-count" id="count-offer">0</span></h2>
@@ -103,6 +120,10 @@
       <div class="board-column" data-status="rejected">
         <h2 class="column-title">Rejected <span class="column-count" id="count-rejected">0</span></h2>
         <div class="column-cards" id="cards-rejected"></div>
+      </div>
+      <div class="board-column" data-status="withdrawn">
+        <h2 class="column-title">Withdrawn <span class="column-count" id="count-withdrawn">0</span></h2>
+        <div class="column-cards" id="cards-withdrawn"></div>
       </div>
     </section>
 
@@ -129,9 +150,12 @@
       <span class="row-date"></span>
       <select class="row-status-select">
         <option value="applied">Applied</option>
-        <option value="interviewing">Interviewing</option>
+        <option value="received">Received</option>
+        <option value="assessment">Assessment</option>
+        <option value="interview">Interview</option>
         <option value="offer">Offer</option>
         <option value="rejected">Rejected</option>
+        <option value="withdrawn">Withdrawn</option>
       </select>
     </article>
   </template>
@@ -149,9 +173,12 @@
       <span class="card-resume-chip hidden"></span>
       <select class="card-status-select">
         <option value="applied">Applied</option>
-        <option value="interviewing">Interviewing</option>
+        <option value="received">Received</option>
+        <option value="assessment">Assessment</option>
+        <option value="interview">Interview</option>
         <option value="offer">Offer</option>
         <option value="rejected">Rejected</option>
+        <option value="withdrawn">Withdrawn</option>
       </select>
     </article>
   </template>
@@ -181,6 +208,36 @@
         </div>
 
         <div class="detail-section">
+          <p class="field-label">Location</p>
+          <p id="detail-location" class="detail-value"></p>
+        </div>
+
+        <div class="detail-section">
+          <p class="field-label">Salary</p>
+          <p id="detail-salary" class="detail-value"></p>
+        </div>
+
+        <div class="detail-section">
+          <p class="field-label">Application ID</p>
+          <p id="detail-application-id" class="detail-value"></p>
+        </div>
+
+        <div class="detail-section">
+          <p class="field-label">Job portal</p>
+          <p id="detail-job-portal" class="detail-value"></p>
+        </div>
+
+        <div class="detail-section">
+          <p class="field-label">Recruiter</p>
+          <p id="detail-recruiter" class="detail-value"></p>
+        </div>
+
+        <div class="detail-section">
+          <p class="field-label">Important links</p>
+          <ul id="detail-important-links" class="detail-links"></ul>
+        </div>
+
+        <div class="detail-section">
           <p class="field-label">Notes</p>
           <p id="detail-notes" class="detail-value"></p>
         </div>
@@ -205,6 +262,27 @@
 
         <label class="field-label">Resume file</label>
         <input id="edit-resume" type="text" placeholder="e.g. adarsh-resume-v3.pdf" />
+
+        <label class="field-label">Location</label>
+        <input id="edit-location" type="text" placeholder="e.g. Remote, San Francisco CA" />
+
+        <label class="field-label">Salary</label>
+        <input id="edit-salary" type="text" placeholder="e.g. $120k–$150k" />
+
+        <label class="field-label">Application ID</label>
+        <input id="edit-application-id" type="text" placeholder="Tracking ID from the job portal" />
+
+        <label class="field-label">Job portal</label>
+        <input id="edit-job-portal" type="text" placeholder="e.g. Workday, Greenhouse" />
+
+        <label class="field-label">Recruiter name</label>
+        <input id="edit-recruiter-name" type="text" />
+
+        <label class="field-label">Recruiter email</label>
+        <input id="edit-recruiter-email" type="email" />
+
+        <label class="field-label">Important links</label>
+        <textarea id="edit-important-links" rows="3" placeholder="One URL per line"></textarea>
 
         <label class="field-label">Notes</label>
         <textarea id="edit-notes" rows="3" placeholder="Recruiter name, interview feedback…"></textarea>

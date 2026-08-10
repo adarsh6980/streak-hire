@@ -402,7 +402,7 @@ body {
 
 .board {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 16px;
 }
 
@@ -648,6 +648,13 @@ body {
   overflow-y: auto;
   padding-right: 6px;
   color: var(--ink-soft);
+}
+
+.detail-links {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .detail-actions {

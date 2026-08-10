@@ -262,7 +262,15 @@ async function importApplications(applications) {
       url: app.url || "",
       source: "import",
       auto: false,
-      status: ["applied", "interviewing", "offer", "rejected"].includes(app.status)
+      status: [
+        "applied",
+        "received",
+        "assessment",
+        "interview",
+        "offer",
+        "rejected",
+        "withdrawn",
+      ].includes(app.status)
         ? app.status
         : "applied",
       appliedAt,
@@ -299,6 +307,18 @@ async function updateApplicationDetails({
   role,
   company,
   description,
+  location,
+  salary,
+  // Named "externalApplicationId" here (not "applicationId") to avoid
+  // colliding with this function's own `applicationId` param, which is the
+  // Firestore document ID being patched — not a field on the document.
+  // It's written to the document under the `applicationId` field name.
+  externalApplicationId,
+  recruiterName,
+  recruiterEmail,
+  jobPortal,
+  importantLinks,
+  tasks,
 }) {
   const session = await getStoredSession();
   if (!session) throw new Error("Not signed in");
@@ -309,6 +329,14 @@ async function updateApplicationDetails({
   if (role !== undefined) patch.role = role;
   if (company !== undefined) patch.company = company;
   if (description !== undefined) patch.description = description;
+  if (location !== undefined) patch.location = location;
+  if (salary !== undefined) patch.salary = salary;
+  if (externalApplicationId !== undefined) patch.applicationId = externalApplicationId;
+  if (recruiterName !== undefined) patch.recruiterName = recruiterName;
+  if (recruiterEmail !== undefined) patch.recruiterEmail = recruiterEmail;
+  if (jobPortal !== undefined) patch.jobPortal = jobPortal;
+  if (importantLinks !== undefined) patch.importantLinks = importantLinks;
+  if (tasks !== undefined) patch.tasks = tasks;
   await updateApplication(session.uid, idToken, applicationId, patch);
   return { ok: true };
 }
@@ -345,10 +373,18 @@ async function getDigest() {
   const last7Days = applications.filter(
     (a) => new Date(a.appliedAt).getTime() >= sevenDaysAgo
   );
-  const interviewsLast7Days = last7Days.filter((a) => a.status === "interviewing").length;
+  const interviewsLast7Days = last7Days.filter((a) => a.status === "interview").length;
   const needsFollowUpList = applications.filter((a) => needsFollowUp(a, now));
 
-  const byStatus = { applied: 0, interviewing: 0, offer: 0, rejected: 0 };
+  const byStatus = {
+    applied: 0,
+    received: 0,
+    assessment: 0,
+    interview: 0,
+    offer: 0,
+    rejected: 0,
+    withdrawn: 0,
+  };
   for (const app of applications) {
     if (byStatus[app.status] !== undefined) byStatus[app.status] += 1;
   }
