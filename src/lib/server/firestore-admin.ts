@@ -184,6 +184,48 @@ export async function adminFirestoreFetch(
   });
 }
 
+// Same fromFirestoreValue/fromFirestoreFields convention as
+// extension/lib/firestore.js — duplicated here for the same cross-package
+// reason toFirestoreValue/toFirestoreFields above are duplicated (this app
+// and extension/ are separate packages with independent module resolution).
+// Parses Firestore REST's typed `{fields: {key: {stringValue: "..."}}}`
+// shape back into a plain JS object/array/primitive tree.
+function fromFirestoreValue(value: unknown): unknown {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if ("stringValue" in v) return v.stringValue;
+  if ("booleanValue" in v) return v.booleanValue;
+  if ("integerValue" in v) return parseInt(String(v.integerValue), 10);
+  if ("doubleValue" in v) return v.doubleValue;
+  if ("timestampValue" in v) return v.timestampValue;
+  if ("nullValue" in v) return null;
+  if ("arrayValue" in v) {
+    const arr = (v.arrayValue as { values?: unknown[] } | undefined)?.values || [];
+    return arr.map(fromFirestoreValue);
+  }
+  if ("mapValue" in v) {
+    const fields = (v.mapValue as { fields?: Record<string, unknown> } | undefined)?.fields || {};
+    return fromFirestoreFields(fields);
+  }
+  return null;
+}
+
+function fromFirestoreFields(fields: Record<string, unknown>): Record<string, unknown> {
+  const obj: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(fields)) {
+    obj[key] = fromFirestoreValue(val);
+  }
+  return obj;
+}
+
+// Firestore's REST API returns each document's full resource name, e.g.
+// "projects/p/databases/(default)/documents/users/u/applications/AbC123".
+// We only ever want the last segment as the usable document ID — same as
+// idFromDocName in extension/lib/firestore.js.
+function idFromDocName(name: string): string {
+  return name.split("/").pop() as string;
+}
+
 export interface GmailConnection {
   refreshToken: string;
   connectedAt: string;
@@ -225,4 +267,175 @@ export async function adminSetUserGmailConnection(
       `Firestore PATCH users/${uid} (gmail connection) failed: ${res.status} ${await res.text()}`
     );
   }
+}
+
+// Generic "get a user's top-level doc, parsed back into plain JS" helper —
+// used by gmail-sync.ts to read users/{uid}.gmail (the refresh token,
+// processedMessageIds, pendingReview, etc.) via the admin/service-account
+// path, since that data was deliberately written where a user's own idToken
+// cannot read it (see this file's header comment). Returns null on 404
+// (doc doesn't exist yet) rather than throwing, mirroring getUserDoc's
+// not-found handling in extension/lib/firestore.js.
+export async function adminGetUserDoc(
+  uid: string
+): Promise<Record<string, unknown> | null> {
+  const res = await adminFirestoreFetch(`users/${uid}`);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(
+      `Firestore GET users/${uid} failed: ${res.status} ${await res.text()}`
+    );
+  }
+  const doc = (await res.json()) as { fields?: Record<string, unknown> };
+  return fromFirestoreFields(doc.fields || {});
+}
+
+// Convenience wrapper over adminGetUserDoc for the one field gmail-sync.ts
+// actually needs to read (the Gmail connection sub-object) — kept as a thin
+// helper rather than a second parsing path, per the task's own suggestion of
+// "add one (or a generic admin get user doc helper)".
+export async function adminGetUserGmailConnection(
+  uid: string
+): Promise<Record<string, unknown> | null> {
+  const userDoc = await adminGetUserDoc(uid);
+  const gmail = userDoc?.gmail;
+  return gmail && typeof gmail === "object" ? (gmail as Record<string, unknown>) : null;
+}
+
+// Generic partial-update helper for users/{uid}, keyed by dotted field paths
+// (e.g. "gmail.status", "gmail.processedMessageIds") exactly like
+// adminSetUserGmailConnection's updateMask.fieldPaths construction above,
+// but reusable for any field set instead of only the gmail-connection ones.
+// Builds the nested `fields` body Firestore expects from the dotted paths.
+export async function adminPatchUserFields(
+  uid: string,
+  fields: Record<string, unknown>
+): Promise<void> {
+  const fieldPaths = Object.keys(fields)
+    .map((p) => `updateMask.fieldPaths=${encodeURIComponent(p)}`)
+    .join("&");
+
+  const nested: Record<string, unknown> = {};
+  for (const [path, value] of Object.entries(fields)) {
+    const parts = path.split(".");
+    let cursor = nested;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const key = parts[i];
+      if (typeof cursor[key] !== "object" || cursor[key] === null) {
+        cursor[key] = {};
+      }
+      cursor = cursor[key] as Record<string, unknown>;
+    }
+    cursor[parts[parts.length - 1]] = value;
+  }
+
+  const res = await adminFirestoreFetch(`users/${uid}?${fieldPaths}`, {
+    method: "PATCH",
+    body: JSON.stringify({ fields: toFirestoreFields(nested) }),
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Firestore PATCH users/${uid} (fields ${Object.keys(fields).join(", ")}) failed: ${res.status} ${await res.text()}`
+    );
+  }
+}
+
+export interface AdminApplicationRecord {
+  id: string;
+  [key: string]: unknown;
+}
+
+// Lists users/{uid}/applications via the admin path — used by gmail-sync.ts
+// to match incoming email classifications against existing applications.
+// Note: Firestore's default list page size caps at 300 docs; this task
+// doesn't paginate (mirrors the deliberate no-pageToken simplification used
+// for Gmail's messages.list in gmail-sync.ts) since a first version's
+// per-user application count is expected to be small.
+export async function adminListApplications(
+  uid: string
+): Promise<AdminApplicationRecord[]> {
+  const res = await adminFirestoreFetch(`users/${uid}/applications`);
+  if (!res.ok) {
+    throw new Error(
+      `Firestore GET users/${uid}/applications failed: ${res.status} ${await res.text()}`
+    );
+  }
+  const doc = (await res.json()) as {
+    documents?: Array<{ name: string; fields?: Record<string, unknown> }>;
+  };
+  return (doc.documents || []).map((d) => ({
+    id: idFromDocName(d.name),
+    ...fromFirestoreFields(d.fields || {}),
+  }));
+}
+
+// Creates a new application doc, mirroring addApplication's shape in
+// extension/lib/firestore.js but authorized via the service account.
+export async function adminCreateApplication(
+  uid: string,
+  application: Record<string, unknown>
+): Promise<AdminApplicationRecord> {
+  const res = await adminFirestoreFetch(`users/${uid}/applications`, {
+    method: "POST",
+    body: JSON.stringify({ fields: toFirestoreFields(application) }),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Firestore POST users/${uid}/applications failed: ${res.status} ${await res.text()}`
+    );
+  }
+  const doc = (await res.json()) as { name: string };
+  return { id: idFromDocName(doc.name), ...application };
+}
+
+// Partial-updates an existing application doc, mirroring updateApplication's
+// PATCH + updateMask.fieldPaths shape in extension/lib/firestore.js.
+export async function adminUpdateApplication(
+  uid: string,
+  applicationId: string,
+  patch: Record<string, unknown>
+): Promise<void> {
+  const fieldPaths = Object.keys(patch)
+    .map((p) => `updateMask.fieldPaths=${encodeURIComponent(p)}`)
+    .join("&");
+
+  const res = await adminFirestoreFetch(
+    `users/${uid}/applications/${applicationId}?${fieldPaths}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ fields: toFirestoreFields(patch) }),
+    }
+  );
+  if (!res.ok) {
+    throw new Error(
+      `Firestore PATCH users/${uid}/applications/${applicationId} failed: ${res.status} ${await res.text()}`
+    );
+  }
+}
+
+// Admin equivalent of addTimelineEvent in extension/lib/firestore.js — same
+// subcollection shape (users/{uid}/applications/{applicationId}/timeline),
+// but authorized via the service account instead of a user idToken, since
+// gmail-sync.ts's writes must work with no live user session (Phase 4 batch
+// job) as well as from this task's route handler.
+export async function adminAddTimelineEvent(
+  uid: string,
+  applicationId: string,
+  event: Record<string, unknown>
+): Promise<{ id: string } & Record<string, unknown>> {
+  const res = await adminFirestoreFetch(
+    `users/${uid}/applications/${applicationId}/timeline`,
+    {
+      method: "POST",
+      body: JSON.stringify({ fields: toFirestoreFields(event) }),
+    }
+  );
+  if (!res.ok) {
+    throw new Error(
+      `Firestore POST users/${uid}/applications/${applicationId}/timeline failed: ${res.status} ${await res.text()}`
+    );
+  }
+  const doc = (await res.json()) as { name: string };
+  return { id: idFromDocName(doc.name), ...event };
 }
