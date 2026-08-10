@@ -108,7 +108,14 @@ const CLASSIFY_BATCH_SIZE = 5;
 const MAX_PROCESSED_IDS = 500;
 const MAX_PENDING_REVIEW = 200;
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+// An alias, not a pinned version — confirmed via a live models.list call
+// against this project's actual API key that "gemini-2.5-flash" itself
+// returns 404 ("no longer available to new users") despite still being
+// listed, while "gemini-flash-latest" resolves correctly (currently to
+// gemini-3.6-flash under the hood, per the response's modelVersion field).
+// Using the alias means this doesn't silently break again the next time
+// Google retires a specific version.
+const GEMINI_MODEL = "gemini-flash-latest";
 
 // ---------------------------------------------------------------------------
 // Classification types
@@ -352,11 +359,67 @@ ${items}
 Return one classification object per email above, each carrying the exact same "messageId" it was given.`;
 }
 
+// The free tier's actual limit is much tighter than assumed when this file
+// was first written — confirmed empirically (not from docs, which don't
+// publish a static number) at exactly 5 requests/minute/model for
+// gemini-2.5-flash via a live 429 response:
+// "GenerateRequestsPerMinutePerProjectPerModel-FreeTier ... quotaValue: 5".
+// A 50-candidate sync at batch size 5 needs 10 calls, so hitting this is the
+// norm, not the exception — every call must be paced and 429s must be
+// retried with backoff, not silently swallowed into "discarded" (that was
+// the bug caught during manual verification: a whole sync run silently
+// produced zero results because every call past the 5th got rate-limited
+// and the generic catch-and-discard fallback masked it).
+const GEMINI_MIN_CALL_SPACING_MS = 13_000; // keeps steady-state calls under 5/min
+const GEMINI_MAX_RATE_LIMIT_RETRIES = 2;
+
+let lastGeminiCallAt = 0;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export class GeminiRateLimitError extends Error {
+  constructor(public retryDelayMs: number) {
+    super(`Gemini rate limit hit, retry after ${retryDelayMs}ms`);
+    this.name = "GeminiRateLimitError";
+  }
+}
+
+// Parses the RetryInfo.retryDelay ("24s"-style) Google includes in a 429
+// body, falling back to a conservative default if the shape isn't as
+// expected (Google's error detail shapes aren't a hard contract to code
+// against, so this must degrade gracefully rather than throw).
+function parseRetryDelayMs(errorBody: unknown): number {
+  const DEFAULT_MS = 15_000;
+  try {
+    const details = (errorBody as { error?: { details?: Array<Record<string, unknown>> } })
+      ?.error?.details;
+    const retryInfo = details?.find(
+      (d) => d["@type"] === "type.googleapis.com/google.rpc.RetryInfo"
+    );
+    const raw = retryInfo?.retryDelay;
+    if (typeof raw === "string" && raw.endsWith("s")) {
+      const seconds = parseFloat(raw.slice(0, -1));
+      if (!Number.isNaN(seconds)) return Math.ceil(seconds * 1000) + 1000; // +1s margin
+    }
+  } catch {
+    // fall through to default
+  }
+  return DEFAULT_MS;
+}
+
 async function callGemini(body: unknown): Promise<unknown> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY env var is not set");
   }
+
+  // Proactive pacing: never fire a call sooner than GEMINI_MIN_CALL_SPACING_MS
+  // after the previous one, regardless of which batch/candidate it's for.
+  const waitFor = lastGeminiCallAt + GEMINI_MIN_CALL_SPACING_MS - Date.now();
+  if (waitFor > 0) await sleep(waitFor);
+  lastGeminiCallAt = Date.now();
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
@@ -367,6 +430,11 @@ async function callGemini(body: unknown): Promise<unknown> {
     }
   );
 
+  if (res.status === 429) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new GeminiRateLimitError(parseRetryDelayMs(errorBody));
+  }
+
   if (!res.ok) {
     throw new Error(
       `Gemini generateContent failed: ${res.status} ${await res.text()}`
@@ -374,6 +442,26 @@ async function callGemini(body: unknown): Promise<unknown> {
   }
 
   return res.json();
+}
+
+// Reactive backoff on top of the proactive pacing above: if a 429 still
+// happens (e.g. another process/tab shared the same key concurrently),
+// wait exactly as long as Google's RetryInfo says and retry, up to
+// GEMINI_MAX_RATE_LIMIT_RETRIES times, before giving up for real.
+async function callGeminiWithRetry(body: unknown): Promise<unknown> {
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await callGemini(body);
+    } catch (err) {
+      if (err instanceof GeminiRateLimitError && attempt < GEMINI_MAX_RATE_LIMIT_RETRIES) {
+        attempt++;
+        await sleep(err.retryDelayMs);
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 interface GeminiGenerateContentResponse {
@@ -428,7 +516,7 @@ function discardedClassification(messageId: string): Classification {
 async function classifyBatchViaGemini(
   candidates: CandidateEmail[]
 ): Promise<Classification[]> {
-  const data = await callGemini({
+  const data = await callGeminiWithRetry({
     contents: [{ role: "user", parts: [{ text: buildClassificationPrompt(candidates) }] }],
     generationConfig: {
       responseMimeType: "application/json",
@@ -446,7 +534,7 @@ async function classifyBatchViaGemini(
 async function classifySingleViaGemini(
   candidate: CandidateEmail
 ): Promise<Classification> {
-  const data = await callGemini({
+  const data = await callGeminiWithRetry({
     contents: [{ role: "user", parts: [{ text: buildClassificationPrompt([candidate]) }] }],
     generationConfig: {
       responseMimeType: "application/json",
