@@ -2,6 +2,7 @@ import { getSession } from "@/lib/server/session";
 import { adminGetUserGmailConnection } from "@/lib/server/firestore-admin";
 import { SyncGmailButton } from "./sync-gmail-button";
 import { DisconnectGmailButton } from "./disconnect-gmail-button";
+import { DeleteDataButton } from "./delete-data-button";
 
 function formatTimestamp(value: unknown): string | null {
   if (typeof value !== "string" || !value) return null;
@@ -144,6 +145,19 @@ export default async function SettingsPage() {
             <dd className="mt-2 font-mono text-[12px] uppercase tracking-wide text-ink-soft">
               In practice, expect a reconnect prompt roughly every 7 days.
             </dd>
+          </div>
+
+          <div>
+            <dt className="font-display font-bold text-sm text-ink">How to delete your data</dt>
+            <dd className="mt-1 font-body text-sm text-ink-soft leading-relaxed">
+              Below is a real delete action, not a support-ticket promise: it removes every
+              application you have, every timeline event under them, and the Gmail connection
+              itself, immediately and permanently. There is no undo — export anything you want to
+              keep first.
+            </dd>
+            <div className="mt-3">
+              <DeleteDataButton />
+            </div>
           </div>
         </dl>
       </section>

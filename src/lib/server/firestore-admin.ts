@@ -615,3 +615,42 @@ export async function adminListApplicationTimeline(
     ...fromFirestoreFields(d.fields || {}),
   }));
 }
+
+// Deletes a single Firestore document at an arbitrary path — the one
+// primitive every "delete X" helper below composes from.
+async function adminDeleteDoc(path: string): Promise<void> {
+  const res = await adminFirestoreFetch(path, { method: "DELETE" });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Firestore DELETE ${path} failed: ${res.status} ${await res.text()}`);
+  }
+}
+
+// Deletes one application AND its timeline subcollection first — Firestore's
+// REST API does not cascade-delete subcollections when you delete a parent
+// document (unlike some other document databases' foreign-key cascades);
+// leaving timeline docs behind would mean "delete my data" silently didn't,
+// for exactly the data (source email IDs, extracted stage info) users are
+// most likely to care about when asking to delete their data.
+export async function adminDeleteApplication(uid: string, applicationId: string): Promise<void> {
+  const timeline = await adminListApplicationTimeline(uid, applicationId);
+  for (const event of timeline) {
+    await adminDeleteDoc(`users/${uid}/applications/${applicationId}/timeline/${event.id}`);
+  }
+  await adminDeleteDoc(`users/${uid}/applications/${applicationId}`);
+}
+
+// Full account data deletion (Settings page's "Delete my data" action, the
+// plan's explicit requirement for "an actual delete-my-data action, not just
+// a support-email promise"). Deletes every application (and each one's
+// timeline, via adminDeleteApplication above) and finally the users/{uid}
+// doc itself (which is also where the Gmail refresh token lives — deleting
+// it means Streakhire can no longer sync this account even before any
+// separate Google-side revocation the user does themselves).
+export async function adminDeleteAllUserData(uid: string): Promise<{ applicationsDeleted: number }> {
+  const applications = await adminListApplications(uid);
+  for (const app of applications) {
+    await adminDeleteApplication(uid, app.id);
+  }
+  await adminDeleteDoc(`users/${uid}`);
+  return { applicationsDeleted: applications.length };
+}
