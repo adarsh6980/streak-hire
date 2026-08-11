@@ -439,3 +439,179 @@ export async function adminAddTimelineEvent(
   const doc = (await res.json()) as { name: string };
   return { id: idFromDocName(doc.name), ...event };
 }
+
+export interface AdminTimelineEventRecord {
+  id: string;
+  applicationId: string;
+  [key: string]: unknown;
+}
+
+// Fetches timeline events across ALL of a user's applications, for feeds
+// that span applications (the dashboard's "recent updates" and the "Inbox
+// Activity" page).
+//
+// CORRECTION (caught via live testing, not caught by the build or by code
+// review): the original version of this function tried a Firestore
+// collectionGroup query (from: [{collectionId: "timeline", allDescendants:
+// true}]) scoped via the request's `parent` field to this one user's own
+// document, on the theory that `parent` + allDescendants:true restricts the
+// collection group to that user's descendants. That theory was wrong —
+// Firestore's actual, confirmed-live behavior is
+// `"collection group queries are only allowed at the root parent"` (a 400
+// INVALID_ARGUMENT), i.e. :runQuery's `parent` MUST be the database root for
+// any collectionGroup query; there is no per-branch-scoped collectionGroup
+// query in Firestore's REST API. Making this work correctly at the root
+// would require every timeline event to carry an explicit `uid` field (it
+// doesn't today) plus a composite index for the resulting where+orderBy
+// query — real production infra setup, not justified yet at this app's
+// scale.
+//
+// Fix: fetch each application's own timeline (adminListApplicationTimeline,
+// already correctly scoped via its document path, no collection-group query
+// needed) in parallel, concurrency-capped the same way gmail-sync.ts caps
+// its own Gmail metadata fetches, then merge + sort in memory. This is
+// O(applications) requests instead of one query — completely fine at
+// hobby-project scale (the same scale assumption adminListApplications
+// already makes), and correct today rather than "correct once an index
+// exists."
+const TIMELINE_FETCH_CONCURRENCY = 5;
+
+export async function adminQueryTimelineAcrossApplications(
+  uid: string,
+  limit: number
+): Promise<AdminTimelineEventRecord[]> {
+  const applications = await adminListApplications(uid);
+
+  const all: AdminTimelineEventRecord[] = [];
+  for (let i = 0; i < applications.length; i += TIMELINE_FETCH_CONCURRENCY) {
+    const chunk = applications.slice(i, i + TIMELINE_FETCH_CONCURRENCY);
+    const chunkResults = await Promise.all(
+      chunk.map(async (app) => {
+        const events = await adminListApplicationTimeline(uid, app.id);
+        return events.map((event) => ({ ...event, applicationId: app.id }));
+      })
+    );
+    for (const events of chunkResults) all.push(...events);
+  }
+
+  all.sort((a, b) => {
+    const aAt = typeof a.detectedAt === "string" ? a.detectedAt : "";
+    const bAt = typeof b.detectedAt === "string" ? b.detectedAt : "";
+    return bAt.localeCompare(aAt);
+  });
+
+  return all.slice(0, limit);
+}
+
+// Lists every top-level users/{uid} doc whose `gmail.status` field equals
+// "connected", via Firestore's :runQuery structured-query endpoint — the
+// REST API has no "list docs where field = value" shortcut without one.
+// Used by the Phase 4 batch-sync route
+// (src/app/api/sync/gmail/batch/route.ts) to find every user an unattended
+// GitHub Actions cron run should sync.
+//
+// Scoping note — the OPPOSITE concern from adminQueryTimelineAcrossApplications
+// above: that timeline query deliberately scopes its `parent` to ONE user's
+// own document (`${FIRESTORE_BASE}/users/{uid}`) so its collection-group
+// query only matches that one user's descendants. Here we want every user,
+// not one user's descendants, so this is a plain (non-collection-group)
+// query against the top-level `users` collection, and `parent` must be the
+// database root — `FIRESTORE_BASE` itself (`.../databases/(default)/documents`)
+// — not any particular user's doc path. Getting this backwards (scoping to a
+// single user doc, like the timeline query does on purpose) would silently
+// return zero results for a top-level collection query.
+//
+// No pagination: like adminListApplications above, a first version doesn't
+// paginate through :runQuery's streamed results — fine while the connected-
+// user count is small (hobby-project scale), a follow-up if it ever isn't.
+export async function adminListConnectedGmailUsers(): Promise<string[]> {
+  const token = await getAccessToken();
+  const res = await fetch(`${FIRESTORE_BASE}:runQuery`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "users" }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "gmail.status" },
+            op: "EQUAL",
+            value: { stringValue: "connected" },
+          },
+        },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Firestore runQuery ${FIRESTORE_BASE}:runQuery (connected gmail users) failed: ${res.status} ${await res.text()}`
+    );
+  }
+
+  const rows = (await res.json()) as Array<{ document?: { name: string } }>;
+
+  return rows.filter((r) => r.document).map((r) => idFromDocName(r.document!.name));
+}
+
+// Fetches ONE application doc (users/{uid}/applications/{applicationId}) —
+// used by the Application detail page (src/app/(app)/applications/[id]/page.tsx)
+// instead of listing every application and filtering client-side. Mirrors
+// adminGetUserDoc's shape (plain fetch + fromFirestoreFields, null on 404)
+// but scoped to an application doc rather than the top-level user doc.
+// Ownership is implicit in the path itself — a request for an applicationId
+// that exists under a *different* uid simply won't be found at
+// users/{uid}/applications/{applicationId}, so the 404 branch here doubles
+// as the "not owned by this session" case the detail page needs to guard.
+export async function adminGetApplication(
+  uid: string,
+  applicationId: string
+): Promise<AdminApplicationRecord | null> {
+  const res = await adminFirestoreFetch(`users/${uid}/applications/${applicationId}`);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(
+      `Firestore GET users/${uid}/applications/${applicationId} failed: ${res.status} ${await res.text()}`
+    );
+  }
+  const doc = (await res.json()) as { fields?: Record<string, unknown> };
+  return { id: applicationId, ...fromFirestoreFields(doc.fields || {}) };
+}
+
+export interface AdminTimelineEventRecordForApplication {
+  id: string;
+  [key: string]: unknown;
+}
+
+// Lists ONE application's timeline subcollection, newest first — the
+// per-application counterpart to adminQueryTimelineAcrossApplications above.
+// Uses the plain listDocuments endpoint (not :runQuery) since there's no
+// cross-document/collection-group scoping concern here, just like
+// adminListApplications's list-and-parse pattern — but with an `orderBy`
+// query param (listDocuments supports orderBy/pageSize/pageToken directly)
+// so the caller gets newest-first without a client-side sort.
+export async function adminListApplicationTimeline(
+  uid: string,
+  applicationId: string
+): Promise<AdminTimelineEventRecordForApplication[]> {
+  const res = await adminFirestoreFetch(
+    `users/${uid}/applications/${applicationId}/timeline?orderBy=${encodeURIComponent(
+      "detectedAt desc"
+    )}`
+  );
+  if (!res.ok) {
+    throw new Error(
+      `Firestore GET users/${uid}/applications/${applicationId}/timeline failed: ${res.status} ${await res.text()}`
+    );
+  }
+  const doc = (await res.json()) as {
+    documents?: Array<{ name: string; fields?: Record<string, unknown> }>;
+  };
+  return (doc.documents || []).map((d) => ({
+    id: idFromDocName(d.name),
+    ...fromFirestoreFields(d.fields || {}),
+  }));
+}

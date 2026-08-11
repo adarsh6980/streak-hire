@@ -1,0 +1,35 @@
+# Phase 4 automatic sync trigger — a thin cron wrapper around
+# POST /api/sync/gmail/batch (src/app/api/sync/gmail/batch/route.ts). All
+# real logic (iterating connected users, calling syncGmailForUser, pacing
+# Gemini calls) lives server-side; this workflow's only job is to call the
+# endpoint on a schedule.
+#
+# Before this can actually run successfully, TWO secrets must be set:
+#   1. SYNC_ENDPOINT_URL — a GitHub Actions repo secret, the deployed app's
+#      base URL, e.g. https://streakhire-web.azurewebsites.net. Never
+#      http://localhost:3000 — this workflow runs on GitHub's own runners,
+#      not on the developer's machine, so a localhost URL can never resolve.
+#      This only makes sense once the app is actually deployed.
+#   2. SYNC_BATCH_SECRET — a GitHub Actions repo secret, AND the exact same
+#      value must also be set as SYNC_BATCH_SECRET in the deployed app's own
+#      environment (Azure App Service > Configuration > Application
+#      settings) — see .env.local.example for how to generate one. The batch
+#      route compares the two; they must match exactly.
+# Until both are set, every run of this workflow will fail harmlessly with a
+# 401 from the endpoint (or a connection error if SYNC_ENDPOINT_URL is still
+# empty/unset) — that's expected and fine for now, since production hasn't
+# been deployed yet.
+name: Gmail sync
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  workflow_dispatch: {}
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger batch sync
+        run: |
+          curl -sf -X POST "${{ secrets.SYNC_ENDPOINT_URL }}/api/sync/gmail/batch" \
+            -H "Authorization: Bearer ${{ secrets.SYNC_BATCH_SECRET }}" \
+            --max-time 280
