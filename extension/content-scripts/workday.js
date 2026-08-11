@@ -3,6 +3,10 @@
 // data-automation-id attributes that are relatively stable across tenants.
 // Role/company/description scraping is shared (lib/detector-utils.js,
 // window.pounceScrapeJobContext).
+//
+// Detecting a submit here no longer writes to Firestore directly — it
+// prompts the shared "Add to tracker" widget (lib/capture-widget.js) instead,
+// same as every other site script. Gmail sync is the core product now.
 
 function isFinalSubmitButton(el) {
   if (!el) return false;
@@ -28,8 +32,11 @@ document.addEventListener(
     );
     if (!onReviewStep) return;
 
-    const { role, company, description } = window.pounceScrapeJobContext();
-    window.pounceReportApplication({ role, company, description, source: "workday" });
+    window.pounceShowCaptureWidget({
+      title: "Application submitted?",
+      body: "Streakhire saw a submit on this Workday application. Add it to your tracker?",
+      source: "workday",
+    });
   },
   true
 );

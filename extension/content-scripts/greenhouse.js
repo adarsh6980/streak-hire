@@ -3,6 +3,10 @@
 // submit button, commonly #submit_app, and posts via a normal form submit.
 // Role/company/description scraping is shared (lib/detector-utils.js,
 // window.pounceScrapeJobContext) rather than duplicated per site.
+//
+// Detecting a submit here no longer writes to Firestore directly — it
+// prompts the shared "Add to tracker" widget (lib/capture-widget.js) instead,
+// same as every other site script. Gmail sync is the core product now.
 
 function isApplicationForm(form) {
   if (!form) return false;
@@ -11,8 +15,11 @@ function isApplicationForm(form) {
 }
 
 function report() {
-  const { role, company, description } = window.pounceScrapeJobContext();
-  window.pounceReportApplication({ role, company, description, source: "greenhouse" });
+  window.pounceShowCaptureWidget({
+    title: "Application submitted?",
+    body: "Streakhire saw a submit on this Greenhouse form. Add it to your tracker?",
+    source: "greenhouse",
+  });
 }
 
 document.addEventListener(

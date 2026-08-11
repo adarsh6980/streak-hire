@@ -27,17 +27,17 @@ export default function ExtensionPage() {
         </p>
 
         <div className="mt-5 space-y-2 font-body text-sm text-ink-soft leading-relaxed">
-          <p>Today, on a page it recognizes, it does two things:</p>
+          <p>Today, on a page it recognizes, it does one thing — prompts, never auto-logs:</p>
           <ul className="list-disc list-inside space-y-1 marker:text-stamp">
             <li>
               On LinkedIn, Greenhouse, Lever, and Workday job postings, plus IrishJobs.ie,
-              Jobs.ie, and PublicJobs.ie, it watches for a successful submission and logs the
-              application automatically — no click needed.
+              Jobs.ie, and PublicJobs.ie, it watches for a successful submission and shows a
+              small &ldquo;Add to tracker?&rdquo; prompt — one click to confirm, nothing written
+              until you do.
             </li>
             <li>
               On any other page that looks like a job application (an &ldquo;apply&rdquo; URL, or
-              a résumé/CV upload field), it shows a small one-click &ldquo;log this
-              application&rdquo; widget as a fallback.
+              a résumé/CV upload field), it shows the same one-click prompt as a fallback.
             </li>
           </ul>
           <p>

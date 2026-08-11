@@ -4,6 +4,10 @@
 // phrase — deliberately conservative to avoid false positives on unrelated
 // submit buttons (search, newsletter signup, etc.). Role/company/description
 // scraping is shared (lib/detector-utils.js, window.pounceScrapeJobContext).
+//
+// Detecting a submit here no longer writes to Firestore directly — it
+// prompts the shared "Add to tracker" widget (lib/capture-widget.js) instead,
+// same as every other site script. Gmail sync is the core product now.
 
 const APPLY_PHRASES = /\b(submit application|submit your application|apply now|send application)\b/i;
 const EXCLUDE_PHRASES = /\b(search|subscribe|newsletter|sign in|log in|filter)\b/i;
@@ -15,8 +19,11 @@ function matchesApplyIntent(text) {
 }
 
 function report() {
-  const { role, company, description } = window.pounceScrapeJobContext();
-  window.pounceReportApplication({ role, company, description, source: "generic" });
+  window.pounceShowCaptureWidget({
+    title: "Application submitted?",
+    body: "Streakhire saw a submit on this page. Add it to your tracker?",
+    source: "generic",
+  });
 }
 
 document.addEventListener(

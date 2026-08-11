@@ -10,6 +10,13 @@
 //    signal. This is the primary detector; the click listener is a backup
 //    for wording variants the observer's phrase list doesn't cover.
 //
+// Gmail sync is the core product now; this script's only remaining job is
+// prompting the "Add to tracker" widget (lib/capture-widget.js) the moment
+// it's confident the user just applied — it no longer writes to Firestore
+// silently on its own. The detection signals above are kept exactly as they
+// were (they're still the best way to know *when* to prompt), only what
+// happens on detection changed.
+//
 // Every step logs to the console under "[Streakhire]" so a failure to detect
 // can be diagnosed from LinkedIn's tab DevTools console without needing to
 // touch this file.
@@ -23,12 +30,12 @@ let reportedForThisModal = false;
 function reportOnce(source) {
   if (reportedForThisModal) return;
   reportedForThisModal = true;
-  // Shared, priority-ordered scraper (lib/detector-utils.js) — LinkedIn's
-  // own selectors are tried first within it, same as before, just no
-  // longer duplicated locally.
-  const { role, company, description } = window.pounceScrapeJobContext();
-  log(`detected via ${source}:`, { role, company });
-  window.pounceReportApplication({ role, company, description, source: "linkedin" });
+  log(`detected via ${source}, prompting capture widget`);
+  window.pounceShowCaptureWidget({
+    title: "Application submitted?",
+    body: "Streakhire saw a submit on this LinkedIn posting. Add it to your tracker?",
+    source: "linkedin",
+  });
 }
 
 const SUBMIT_LABEL = /\bsubmit(\s+your)?\s+application\b|^submit$/i;

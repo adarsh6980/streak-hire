@@ -8,11 +8,18 @@ import {
   listRecentApplications,
 } from "./lib/firestore.js";
 import { applyStreakUpdate } from "./lib/streak.js";
+import { matchApplication } from "./lib/matching.js";
 
 const FOLLOW_UP_AFTER_DAYS = 7;
 const FOLLOW_UP_ALARM = "streakhire-follow-up-check";
 const DIGEST_ALARM = "streakhire-weekly-digest";
-const DASHBOARD_URL = chrome.runtime.getURL("dashboard/dashboard.html");
+// Points at the full web app now (the primary Gmail-first dashboard), not
+// the extension's own bundled dashboard/dashboard.html — that page still
+// exists on disk as a fallback (it still works standalone against the same
+// Firestore data) but is no longer the surface this button opens, per the
+// product's pivot to the web app as the core experience. Update this if the
+// production domain ever changes from the current Azure App Service URL.
+const DASHBOARD_URL = "https://streakhire-web.azurewebsites.net/dashboard";
 
 async function ensureUserDoc(uid, idToken, profile) {
   const existing = await getUserDoc(uid, idToken);
@@ -72,6 +79,31 @@ async function logApplication({ company, role, url, source, auto, resumeFileName
   if (!session) throw new Error("Not signed in");
   const idToken = await getValidIdToken();
 
+  // Duplicate check (Phase 5): the same company (now possibly already
+  // tracked via Gmail sync, or a repeat "Add to tracker" click on a page
+  // already captured) shouldn't create a second application doc. Uses the
+  // same matching algorithm as the Gmail sync engine's matchApplication
+  // (lib/matching.js — ported, not shared, see that file's header comment).
+  // Capped at 200 like listAllApplications elsewhere in this file — fine at
+  // this app's scale, not meant to paginate through a very large history.
+  const existing = await listRecentApplications(session.uid, idToken, 200);
+  const match = matchApplication({ company, role }, existing);
+
+  if (match) {
+    if (auto) {
+      chrome.notifications.create(`already-tracked-${Date.now()}`, {
+        type: "basic",
+        iconUrl: "icons/icon128.png",
+        title: "Already tracked",
+        message: `${match.role} at ${match.company} is already in your tracker.`,
+      });
+    }
+    // No new streak credit for a duplicate — the streak counts distinct
+    // logged applications, not repeat clicks/detections of the same one.
+    const userDoc = await getUserDoc(session.uid, idToken);
+    return { streak: userDoc?.streak || null, application: match, duplicate: true };
+  }
+
   const userDoc = await getUserDoc(session.uid, idToken);
   const nextStreak = applyStreakUpdate(userDoc?.streak);
 
@@ -106,7 +138,7 @@ async function logApplication({ company, role, url, source, auto, resumeFileName
     });
   }
 
-  return { streak: nextStreak, application: created };
+  return { streak: nextStreak, application: created, duplicate: false };
 }
 
 // Self-contained on purpose: chrome.scripting.executeScript serializes this

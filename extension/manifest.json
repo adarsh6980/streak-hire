@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Streakhire \u2014 Auto-track job applications",
   "short_name": "Streakhire",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Postmarks every job application the instant you hit submit. Your streak and pipeline update themselves.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1ntrJkH6UAHP8nXZiY1vFjZlUpxzijNemb3LaHNM4ck7FolcQgLCQLrir1S8lSRWsFV2BnQ3f4gOBkEyZD+BCYNwFCktk+GCbiZORwmlvp+znb54mrN7yWv6suhKDUg9nz1Pho0QL+IqP+FbP7LJNvuy+VYhhdXo0hY7YUl8xWKQ4GO0Bi4ykY27g7lhkvO3k7zgTEHwxKAWDUAmpV0SvJ/JBM/br5WqmFuqLEYKo3SANCOBc04eozXTXKD652mzoIlu9uDTS2/d12pwEfIuCB4VTDq8yZAl6K9dU5cdgTq390iqu4opq8QIx8mvq49vyQe6gGX2bcQomKAenZMWbQIDAQAB",
   "icons": {
@@ -52,6 +52,7 @@
       ],
       "js": [
         "lib/detector-utils.js",
+        "lib/capture-widget.js",
         "content-scripts/linkedin.js"
       ],
       "run_at": "document_idle"
@@ -62,6 +63,7 @@
       ],
       "js": [
         "lib/detector-utils.js",
+        "lib/capture-widget.js",
         "content-scripts/greenhouse.js"
       ],
       "run_at": "document_idle"
@@ -72,6 +74,7 @@
       ],
       "js": [
         "lib/detector-utils.js",
+        "lib/capture-widget.js",
         "content-scripts/lever.js"
       ],
       "run_at": "document_idle"
@@ -82,6 +85,7 @@
       ],
       "js": [
         "lib/detector-utils.js",
+        "lib/capture-widget.js",
         "content-scripts/workday.js"
       ],
       "run_at": "document_idle"
@@ -94,6 +98,7 @@
       ],
       "js": [
         "lib/detector-utils.js",
+        "lib/capture-widget.js",
         "content-scripts/generic.js"
       ],
       "run_at": "document_idle"
@@ -104,6 +109,7 @@
       ],
       "js": [
         "lib/detector-utils.js",
+        "lib/capture-widget.js",
         "content-scripts/universal-widget.js"
       ],
       "run_at": "document_idle"

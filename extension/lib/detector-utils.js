@@ -174,21 +174,45 @@ window.pounceScrapeJobContext = function scrapeJobContext() {
   return { role, company, description };
 };
 
-// Call this from a site detector once it's confident a submit happened.
+// Called from the capture widget's (lib/capture-widget.js) click handler,
+// which awaits this and needs a real success/failure result to update its
+// UI ("Added ✓" vs "Sign in first" vs a generic error) — this must be a
+// proper Promise, not fire-and-forget.
+//
+// Uses LOG_APPLICATION (not APPLICATION_DETECTED) — every capture now goes
+// through an explicit widget click (Phase 7: no more silent auto-detection
+// anywhere), so `auto: false` is the honest value for all of these now, the
+// same way the original quick-confirm widget already treated a click-confirm
+// as manual even though the scraping itself was automatic.
 window.pounceReportApplication = function reportApplication({ company, role, source, description }) {
   const dedupeKey = `${source}:${location.href}`;
-  if (alreadyReported(dedupeKey)) return;
+  if (alreadyReported(dedupeKey)) return Promise.resolve({ skipped: true });
   markReported(dedupeKey);
 
-  chrome.runtime.sendMessage({
-    type: "APPLICATION_DETECTED",
-    payload: {
-      company,
-      role,
-      description: description || null,
-      url: location.href,
-      source,
-      resumeFileName: window.pounceFindResumeFileName(),
-    },
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      {
+        type: "LOG_APPLICATION",
+        payload: {
+          company,
+          role,
+          description: description || null,
+          url: location.href,
+          source,
+          resumeFileName: window.pounceFindResumeFileName(),
+        },
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        if (!response || !response.ok) {
+          reject(new Error(response?.error || "Unknown error"));
+          return;
+        }
+        resolve(response.data);
+      }
+    );
   });
 };
